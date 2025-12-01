@@ -1,0 +1,5 @@
+{
+  "name": "LawyerOS",
+  "description": "A Notion-style case management system for legal professionals, featuring task tracking, timers, and case archives.",
+  "requestFramePermissions": []
+}
