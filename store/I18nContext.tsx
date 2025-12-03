@@ -85,7 +85,12 @@ const dictionaries: Record<Lang, Record<string, string>> = {
     'delete.confirm.title': 'Confirm Delete Case',
     'delete.confirm.message': 'This will remove the case and return to dashboard. Confirm?',
     'delete.confirm.ok': 'Delete',
-    'delete.confirm.cancel': 'Cancel'
+    'delete.confirm.cancel': 'Cancel',
+    'timer.start': 'Start',
+    'timer.pause': 'Pause',
+    'timer.minimize': 'Minimize',
+    'timer.restore': 'Restore',
+    'timer.noTask': 'No Task'
   },
   zh: {
     'nav.search': '搜索',
@@ -163,7 +168,12 @@ const dictionaries: Record<Lang, Record<string, string>> = {
     'delete.confirm.title': '确认删除案件',
     'delete.confirm.message': '此操作将移除案件并返回仪表盘，请确认。',
     'delete.confirm.ok': '确认删除',
-    'delete.confirm.cancel': '取消'
+    'delete.confirm.cancel': '取消',
+    'timer.start': '开始',
+    'timer.pause': '暂停',
+    'timer.minimize': '最小化',
+    'timer.restore': '还原',
+    'timer.noTask': '无任务'
   }
 };
 
@@ -196,4 +206,3 @@ export const useI18n = () => {
   if (!ctx) throw new Error('useI18n must be used within I18nProvider');
   return ctx;
 };
-

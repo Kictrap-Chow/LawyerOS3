@@ -7,6 +7,7 @@ import { CaseDetail } from './pages/CaseDetail';
 import { PartyManager } from './pages/PartyManager';
 import { CaseForm } from './components/CaseForm';
 import { GlobalSearch } from './components/GlobalSearch';
+import { FloatingTimer } from './components/FloatingTimer';
 
 const MainLayout: React.FC = () => {
   const { activeView, navigate, addCase, cases, updateCase } = useData();
@@ -62,6 +63,7 @@ const MainLayout: React.FC = () => {
       )}
 
       {showSearch && <GlobalSearch onClose={() => setShowSearch(false)} />}
+      <FloatingTimer />
     </div>
   );
 };
