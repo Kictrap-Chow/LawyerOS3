@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../store/DataContext';
+import { useI18n } from '../store/I18nContext';
 import { Case, Task, Log, Reminder, Deadline, Party, Proceeding } from '../types';
 import { calculateTaskDuration, formatTimeDuration, nowISO, uuid, formatDateTime } from '../utils';
 import { 
@@ -636,6 +637,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
 
 export const CaseDetail: React.FC = () => {
   const { cases, activeCaseId, updateCase, deleteCase, navigate, parties } = useData();
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'>('info');
   const currentCase = cases.find(c => c.id === activeCaseId);
   const [isEditing, setIsEditing] = useState(false);
@@ -787,7 +789,7 @@ export const CaseDetail: React.FC = () => {
       <div className="px-8 py-6 border-b border-[#e9e9e7] sticky top-0 bg-white/80 backdrop-blur-md z-10 flex justify-between items-start">
         <div>
           <div className="flex items-center gap-2 mb-2 text-sm text-gray-500">
-             <span className="cursor-pointer hover:underline" onClick={() => navigate('dashboard')}>Dashboard</span> / <span>Cases</span>
+             <span className="cursor-pointer hover:underline" onClick={() => navigate('dashboard')}>{t('breadcrumbs.dashboard')}</span> / <span>{t('breadcrumbs.cases')}</span>
           </div>
           <h1 className="text-3xl font-bold text-[#37352f] flex items-center gap-3">
             {currentCase.name}
@@ -800,22 +802,22 @@ export const CaseDetail: React.FC = () => {
         </div>
         <div className="flex gap-2">
            {!isEditing ? (
-             <button onClick={() => { setIsEditing(true); setDraftCase(currentCase); }} className="px-3 py-1.5 border border-gray-200 rounded text-sm hover:bg-gray-50">Edit Properties</button>
+             <button onClick={() => { setIsEditing(true); setDraftCase(currentCase); }} className="px-3 py-1.5 border border-gray-200 rounded text-sm hover:bg-gray-50">{t('actions.edit')}</button>
            ) : (
-             <button onClick={() => { if (draftCase) updateCase(draftCase); setIsEditing(false); }} className="px-3 py-1.5 border border-gray-200 rounded text-sm hover:bg-gray-50 bg-black text-white">Save Changes</button>
+             <button onClick={() => { if (draftCase) updateCase(draftCase); setIsEditing(false); }} className="px-3 py-1.5 border border-gray-200 rounded text-sm hover:bg-gray-50 bg-black text-white">{t('actions.saveChanges')}</button>
            )}
            <button 
              onClick={() => setShowDeleteConfirm(true)}
              className="px-3 py-1.5 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50"
-           >Delete Case</button>
+           >{t('actions.deleteCase')}</button>
            <select 
              className="px-3 py-1.5 border border-gray-200 rounded text-sm hover:bg-gray-50 outline-none cursor-pointer"
              value={currentCase.status}
              onChange={handleStatusChange}
            >
-              <option value="active">Active</option>
-              <option value="dormant">Dormant</option>
-              <option value="archived">Archived</option>
+              <option value="active">{t('status.active')}</option>
+              <option value="dormant">{t('status.dormant')}</option>
+              <option value="archived">{t('status.archived')}</option>
            </select>
         </div>
       </div>
@@ -828,7 +830,7 @@ export const CaseDetail: React.FC = () => {
             onClick={() => setActiveTab(tab as any)}
             className={`py-3 cursor-pointer border-b-2 transition-colors capitalize ${activeTab === tab ? 'border-black text-black font-medium' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
           >
-            {tab === 'trash' ? 'Recycle Bin' : tab}
+            {tab === 'trash' ? t('tabs.trash') : t(`tabs.${tab}`)}
           </div>
         ))}
       </div>
@@ -850,7 +852,7 @@ export const CaseDetail: React.FC = () => {
           {activeTab === 'tasks' && (
             <div className="animate-fade-in">
               <div className="flex justify-between items-center mb-4">
-                 <h3 className="font-bold text-gray-700">Tasks ({currentCase.tasks.length})</h3>
+                 <h3 className="font-bold text-gray-700">{t('tasks.title')} ({currentCase.tasks.length})</h3>
                  <div className="flex gap-2">
                     <button 
                       onClick={() => {
@@ -897,10 +899,10 @@ export const CaseDetail: React.FC = () => {
                     }}
                       className="flex items-center gap-1 border border-gray-200 text-gray-600 px-3 py-1.5 rounded text-sm hover:bg-gray-50"
                     >
-                      <FileText size={16} /> Export
+                      <FileText size={16} /> {t('tasks.export')}
                     </button>
                     <button onClick={handleAddTask} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 shadow-sm">
-                      <Plus size={16} /> Add Task
+                      <Plus size={16} /> {t('tasks.add')}
                     </button>
                  </div>
               </div>
@@ -920,7 +922,7 @@ export const CaseDetail: React.FC = () => {
                  <textarea 
                    id="logInput"
                    className="w-full border border-gray-300 rounded p-3 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-                   placeholder="Log a new event or note..."
+                   placeholder={t('logs.placeholder')}
                    rows={2}
                    onKeyDown={(e) => {
                      if (e.key === 'Enter' && !e.shiftKey) {
@@ -937,7 +939,7 @@ export const CaseDetail: React.FC = () => {
                        el.value = '';
                     }}
                     className="bg-gray-800 text-white px-4 rounded hover:bg-black transition-colors"
-                 >Post</button>
+                 >{t('logs.post')}</button>
                </div>
                <div className="space-y-6 relative border-l border-gray-200 ml-4 pl-8">
                  {currentCase.logs.map(log => (
@@ -964,20 +966,20 @@ export const CaseDetail: React.FC = () => {
               <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg mb-6 flex items-end gap-2">
                <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
                  <div className="col-span-2">
-                    <label className="block text-xs text-blue-700 font-bold mb-1">NEW EVENT</label>
-                    <input id="sch-title" placeholder="Event (e.g. Court Hearing, Client Meeting)" className="w-full text-sm p-2 rounded border border-blue-200 outline-none" />
+                     <label className="block text-xs text-blue-700 font-bold mb-1">{t('schedule.newEvent')}</label>
+                     <input id="sch-title" placeholder={t('schedule.eventPlaceholder')} className="w-full text-sm p-2 rounded border border-blue-200 outline-none" />
                  </div>
                  <div>
-                    <label className="block text-xs text-blue-700 font-bold mb-1">DATE & TIME</label>
+                     <label className="block text-xs text-blue-700 font-bold mb-1">{t('schedule.dateTime')}</label>
                     <div className="flex gap-1">
                        <input id="sch-date" type="date" className="w-full text-sm p-2 rounded border border-blue-200 outline-none" />
                        <input id="sch-time" type="time" className="w-24 text-sm p-2 rounded border border-blue-200 outline-none" />
                     </div>
                  </div>
                </div>
-               <button 
-                 className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 shadow-sm h-[38px]"
-                 onClick={() => {
+                <button 
+                  className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 shadow-sm h-[38px]"
+                  onClick={() => {
                    const t = (document.getElementById('sch-title') as HTMLInputElement).value;
                    const d = (document.getElementById('sch-date') as HTMLInputElement).value;
                    const time = (document.getElementById('sch-time') as HTMLInputElement).value;
@@ -987,7 +989,7 @@ export const CaseDetail: React.FC = () => {
                      (document.getElementById('sch-time') as HTMLInputElement).value = '';
                    }
                  }}
-               >Add</button>
+               >{t('schedule.add')}</button>
               </div>
 
               <div className="space-y-2">
@@ -1059,7 +1061,7 @@ export const CaseDetail: React.FC = () => {
             <div className="animate-fade-in">
               <div className="bg-red-50 border border-red-100 p-4 rounded-lg mb-6 flex items-end gap-2">
                 <div className="flex-1">
-                  <label className="block text-xs text-red-700 font-bold mb-1">NEW DEADLINE</label>
+                  <label className="block text-xs text-red-700 font-bold mb-1">{t('deadlines.new')}</label>
                   <input id="dl-title" placeholder="Description (e.g. Evidence Submission)" className="w-full text-sm p-2 rounded border border-red-200 outline-none mb-2" />
                   <input id="dl-date" type="date" className="w-full text-sm p-2 rounded border border-red-200 outline-none" />
                 </div>
@@ -1073,7 +1075,7 @@ export const CaseDetail: React.FC = () => {
                       (document.getElementById('dl-title') as HTMLInputElement).value = '';
                     }
                   }}
-                >Add</button>
+                >{t('deadlines.add')}</button>
               </div>
 
               <div className="space-y-2">

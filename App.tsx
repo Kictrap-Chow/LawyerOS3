@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { DataProvider, useData } from './store/DataContext';
+import { I18nProvider } from './store/I18nContext';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './pages/Dashboard';
 import { CaseDetail } from './pages/CaseDetail';
@@ -67,8 +68,10 @@ const MainLayout: React.FC = () => {
 
 export default function App() {
   return (
-    <DataProvider>
-      <MainLayout />
-    </DataProvider>
+    <I18nProvider>
+      <DataProvider>
+        <MainLayout />
+      </DataProvider>
+    </I18nProvider>
   );
 }

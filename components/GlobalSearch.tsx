@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../store/DataContext';
 import { Search } from 'lucide-react';
+import { useI18n } from '../store/I18nContext';
 
 export const GlobalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { cases, parties, navigate } = useData();
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const { t } = useI18n();
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -104,7 +106,7 @@ export const GlobalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) => 
           <input 
             ref={inputRef}
             className="flex-1 text-lg outline-none placeholder-gray-300" 
-            placeholder="Search cases, tasks, people..." 
+            placeholder={`${t('nav.search')} cases, tasks, people...`} 
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
