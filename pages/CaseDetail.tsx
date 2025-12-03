@@ -86,6 +86,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
   // Manual entry state
   const [manualStart, setManualStart] = useState('');
   const [manualEnd, setManualEnd] = useState('');
+  const [showSessions, setShowSessions] = useState(false);
 
   useEffect(() => {
     let interval: any;
@@ -163,6 +164,40 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
     }
     updated.isCompleted = true;
     updated.completedAt = nowISO();
+    onUpdate(updated);
+  };
+
+  const isoToLocalInput = (iso: string | null) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const localInputToIso = (val: string) => {
+    if (!val) return '';
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString();
+  };
+  const updateSessionField = (idx: number, field: 'start' | 'end', value: string) => {
+    const updated = { ...task };
+    const next = [...updated.sessions];
+    const iso = localInputToIso(value);
+    next[idx] = { ...next[idx], [field]: iso || null } as any;
+    updated.sessions = next;
+    onUpdate(updated);
+  };
+  const endSessionNow = (idx: number) => {
+    const updated = { ...task };
+    const next = [...updated.sessions];
+    next[idx] = { ...next[idx], end: nowISO() } as any;
+    updated.sessions = next;
+    updated.isRunning = false;
+    onUpdate(updated);
+  };
+  const deleteSession = (idx: number) => {
+    const updated = { ...task };
+    updated.sessions = (updated.sessions || []).filter((_, i) => i !== idx);
     onUpdate(updated);
   };
 
@@ -270,7 +305,59 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
         )}
          <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all absolute top-2 right-2 sm:static">
              <Trash2 size={12} />
-         </button>
+        </button>
+      </div>
+      <div className="mt-2">
+        <button
+          type="button"
+          className={`text-xs px-2 py-1 rounded border ${showSessions ? 'bg-gray-100' : 'bg-white'}`}
+          onClick={() => setShowSessions(!showSessions)}
+        >
+          Sessions
+        </button>
+        {showSessions && (
+          <div className="mt-2 space-y-2">
+            {(task.sessions || []).map((s, idx) => (
+              <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center border rounded p-2 bg-gray-50">
+                <div className="sm:col-span-5">
+                  <label className="block text-[10px] text-gray-500 mb-1">Start</label>
+                  <input
+                    type="datetime-local"
+                    className="w-full text-xs border border-gray-300 rounded px-2 py-1 outline-none"
+                    value={isoToLocalInput(s.start)}
+                    onChange={(e) => updateSessionField(idx, 'start', e.target.value)}
+                  />
+                </div>
+                <div className="sm:col-span-5">
+                  <label className="block text-[10px] text-gray-500 mb-1">End</label>
+                  <input
+                    type="datetime-local"
+                    className="w-full text-xs border border-gray-300 rounded px-2 py-1 outline-none"
+                    value={isoToLocalInput(s.end)}
+                    onChange={(e) => updateSessionField(idx, 'end', e.target.value)}
+                  />
+                </div>
+                <div className="sm:col-span-2 flex items-end gap-2">
+                  {!s.end && (
+                    <button
+                      type="button"
+                      className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+                      onClick={() => endSessionNow(idx)}
+                    >End Now</button>
+                  )}
+                  <button
+                    type="button"
+                    className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 border border-red-200 hover:bg-red-100"
+                    onClick={() => deleteSession(idx)}
+                  >Delete</button>
+                </div>
+              </div>
+            ))}
+            {(task.sessions || []).length === 0 && (
+              <div className="text-xs text-gray-400">No sessions yet.</div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
