@@ -11,6 +11,14 @@ export interface Party {
   note?: string;
 }
 
+export interface Personnel {
+  id: string;
+  role: string;
+  name: string;
+  contact: string;
+  note: string;
+}
+
 export interface Proceeding {
   id: string;
   stageName: string; // e.g., "First Instance"
@@ -18,26 +26,26 @@ export interface Proceeding {
   caseNo: string;
   courtName: string;
   courtAddress: string;
-  // Personnel
-  judgeName: string;
-  judgeContact: string;
-  judgeNote: string;
-  assistantName: string;
-  assistantContact: string;
-  assistantNote: string;
-  clerkName: string;
-  clerkContact: string;
-  clerkNote: string;
-  // Arbitration specific
-  chiefArb: string;
-  chiefNote: string;
-  myArb: string;
-  myArbNote: string;
-  oppArb: string;
-  oppArbNote: string;
-  secName: string;
-  secContact: string;
-  secNote: string;
+  personnel: Personnel[];
+  // Legacy fields for backward compatibility
+  judgeName?: string;
+  judgeContact?: string;
+  judgeNote?: string;
+  assistantName?: string;
+  assistantContact?: string;
+  assistantNote?: string;
+  clerkName?: string;
+  clerkContact?: string;
+  clerkNote?: string;
+  chiefArb?: string;
+  chiefNote?: string;
+  myArb?: string;
+  myArbNote?: string;
+  oppArb?: string;
+  oppArbNote?: string;
+  secName?: string;
+  secContact?: string;
+  secNote?: string;
 }
 
 export interface TaskSession {
@@ -55,6 +63,7 @@ export interface Task {
   createdAt: string;
   completedAt: string | null;
   sessions: TaskSession[];
+  manualTime?: number; // Manual added duration in seconds
   isRunning: boolean;
   isCompleted: boolean;
 }
@@ -79,6 +88,13 @@ export interface Deadline {
   completed: boolean;
 }
 
+export interface Trash {
+  tasks: Task[];
+  logs: Log[];
+  reminders: Reminder[];
+  deadlines: Deadline[];
+}
+
 export interface Case {
   id: string;
   name: string;
@@ -96,6 +112,7 @@ export interface Case {
   logs: Log[];
   reminders: Reminder[];
   deadlines: Deadline[];
+  trash?: Trash;
 }
 
 export interface AppData {

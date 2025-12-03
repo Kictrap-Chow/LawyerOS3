@@ -25,6 +25,11 @@ export const todayISO = () => new Date().toISOString().split('T')[0];
 
 export const calculateTaskDuration = (task: any): number => {
   let d = 0;
+  // Add manual time if exists
+  if (task.manualTime) {
+    d += task.manualTime;
+  }
+  // Add session time
   (task.sessions || []).forEach((s: any) => {
     if (s.end) {
       d += (new Date(s.end).getTime() - new Date(s.start).getTime()) / 1000;

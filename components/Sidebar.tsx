@@ -11,12 +11,13 @@ export const Sidebar: React.FC<{ onSearch: () => void, onCreateCase: () => void 
   const [editingTitle, setEditingTitle] = useState(false);
 
   const activeCases = cases.filter(c => c.status !== 'archived');
+  const weight = (s: string) => (s === 'dormant' ? 1 : 0);
   const groupedCases = {
-    'Litigation': activeCases.filter(c => c.type === '诉讼'),
-    'Arbitration': activeCases.filter(c => c.type === '仲裁'),
-    'Advisory': activeCases.filter(c => c.type === '常年法律顾问'),
-    'Special': activeCases.filter(c => c.type === '专项法律服务'),
-    'Dispute': activeCases.filter(c => c.type === '争议解决'),
+    'Litigation': activeCases.filter(c => c.type === '诉讼').sort((a,b) => weight(a.status) - weight(b.status) || a.name.localeCompare(b.name)),
+    'Arbitration': activeCases.filter(c => c.type === '仲裁').sort((a,b) => weight(a.status) - weight(b.status) || a.name.localeCompare(b.name)),
+    'Advisory': activeCases.filter(c => c.type === '常年法律顾问').sort((a,b) => weight(a.status) - weight(b.status) || a.name.localeCompare(b.name)),
+    'Special': activeCases.filter(c => c.type === '专项法律服务').sort((a,b) => weight(a.status) - weight(b.status) || a.name.localeCompare(b.name)),
+    'Dispute': activeCases.filter(c => c.type === '争议解决').sort((a,b) => weight(a.status) - weight(b.status) || a.name.localeCompare(b.name)),
   };
 
   const NavItem = ({ icon: Icon, label, active, onClick, badge }: any) => (

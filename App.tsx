@@ -8,7 +8,7 @@ import { CaseForm } from './components/CaseForm';
 import { GlobalSearch } from './components/GlobalSearch';
 
 const MainLayout: React.FC = () => {
-  const { activeView, navigate, addCase } = useData();
+  const { activeView, navigate, addCase, cases, updateCase } = useData();
   const [showCaseForm, setShowCaseForm] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
@@ -18,18 +18,33 @@ const MainLayout: React.FC = () => {
         onSearch={() => setShowSearch(true)} 
         onCreateCase={() => setShowCaseForm(true)} 
       />
-      <main className="flex-1 h-full overflow-hidden relative bg-white">
+      <main className="flex-1 h-full overflow-y-auto relative bg-white">
         {activeView === 'dashboard' && <Dashboard />}
         {activeView === 'case' && <CaseDetail />}
         {activeView === 'parties' && <PartyManager />}
         {activeView === 'archives' && (
            <div className="p-8">
              <h1 className="text-2xl font-bold mb-4">Archived Cases</h1>
-             <p className="text-gray-500">Archived cases are read-only. Restore them to edit.</p>
-             {/* Simple archive list implemented inline for brevity */}
+             <p className="text-gray-500">Archived cases are read-only. You can restore to continue editing.</p>
              <div className="mt-6 space-y-2">
-                {/* Cases filter logic is in sidebar, this is just a placeholder view */}
-                <button onClick={() => navigate('dashboard')} className="text-blue-600 hover:underline">Return to Dashboard</button>
+               {cases.filter(c => c.status === 'archived').length === 0 && (
+                 <div className="text-gray-400">No archived cases.</div>
+               )}
+               {cases.filter(c => c.status === 'archived').map(c => (
+                 <div key={c.id} className="flex items-center justify-between p-3 border rounded bg-white">
+                   <div>
+                     <div className="font-medium">{c.name}</div>
+                     <div className="text-xs text-gray-500">{c.type}</div>
+                   </div>
+                   <div className="flex gap-2">
+                     <button onClick={() => navigate('case', c.id)} className="px-3 py-1 text-sm border rounded hover:bg-gray-50">Open</button>
+                     <button onClick={() => updateCase({ ...c, status: 'active' })} className="px-3 py-1 text-sm border rounded hover:bg-gray-50">Restore</button>
+                   </div>
+                 </div>
+               ))}
+               <div className="mt-4">
+                 <button onClick={() => navigate('dashboard')} className="text-blue-600 hover:underline">Return to Dashboard</button>
+               </div>
              </div>
            </div>
         )}

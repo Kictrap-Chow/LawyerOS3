@@ -28,12 +28,16 @@ export const CaseForm: React.FC<CaseFormProps> = ({ onClose, onSave }) => {
       reminders: [],
       deadlines: []
     };
-    
-    if(newCase.type === '诉讼' || newCase.type === '仲裁') {
+
+    if (newCase.type !== '专项法律服务' && newCase.type !== '常年法律顾问') {
       newCase.litigation.proceedings.push({
-         id: uuid(), stageName: '一审', myRole: '原告', caseNo: '', courtName: '', courtAddress: '',
-         judgeName: '', judgeContact: '', judgeNote: '', assistantName: '', assistantContact: '', assistantNote: '', clerkName: '', clerkContact: '', clerkNote: '',
-         chiefArb: '', chiefNote: '', myArb: '', myArbNote: '', oppArb: '', oppArbNote: '', secName: '', secContact: '', secNote: ''
+        id: uuid(),
+        stageName: '一审',
+        myRole: '原告',
+        caseNo: '',
+        courtName: '',
+        courtAddress: '',
+        personnel: []
       });
     }
 
@@ -43,7 +47,7 @@ export const CaseForm: React.FC<CaseFormProps> = ({ onClose, onSave }) => {
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white rounded-lg shadow-xl w-[400px] p-6 animate-fade-in">
+      <div className="bg-white rounded-lg shadow-xl w-[400px] max-w-[95vw] max-h-[85vh] overflow-y-auto p-6 animate-fade-in">
         <h2 className="text-xl font-bold mb-4 text-[#37352f]">Create New Case</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

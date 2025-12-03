@@ -22,15 +22,75 @@ export const GlobalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   if (q) {
     // Search Cases
     cases.forEach(c => {
-      if (c.name.toLowerCase().includes(q)) results.push({ type: 'Case', title: c.name, sub: c.type, action: () => navigate('case', c.id) });
-      c.tasks.forEach(t => {
-        if (t.desc.toLowerCase().includes(q)) results.push({ type: 'Task', title: t.desc, sub: `in ${c.name}`, action: () => navigate('case', c.id) });
+      // Search basic case info
+      if (
+        c.name?.toLowerCase().includes(q) || 
+        c.type?.toLowerCase().includes(q) ||
+        c.clientContactName?.toLowerCase().includes(q) ||
+        c.clientContactInfo?.toLowerCase().includes(q) ||
+        c.specialProjectRemarks?.toLowerCase().includes(q)
+      ) {
+        results.push({ type: 'Case', title: c.name, sub: c.type, action: () => navigate('case', c.id) });
+      }
+
+      // Search Tasks
+      c.tasks?.forEach(t => {
+        if (t.desc?.toLowerCase().includes(q) || t.notes?.toLowerCase().includes(q)) {
+          results.push({ type: 'Task', title: t.desc, sub: `in ${c.name}`, action: () => navigate('case', c.id) });
+        }
       });
+
+      // Search Logs
+      c.logs?.forEach(l => {
+        if (l.content?.toLowerCase().includes(q)) {
+          results.push({ type: 'Log', title: l.content.substring(0, 50) + '...', sub: `in ${c.name}`, action: () => navigate('case', c.id) });
+        }
+      });
+
+      // Search Case Parties (Clients & Opponents)
+      [...(c.clients || []), ...(c.opponents || [])].forEach(p => {
+        if (
+          p.name?.toLowerCase().includes(q) || 
+          p.idCode?.includes(q) || 
+          p.address?.includes(q) || 
+          p.note?.toLowerCase().includes(q)
+        ) {
+           results.push({ type: 'Party', title: p.name, sub: `in ${c.name}`, action: () => navigate('case', c.id) });
+        }
+      });
+
+      // Search Proceedings
+      if (c.litigation && c.litigation.proceedings) {
+        c.litigation.proceedings.forEach(proc => {
+          // Helper to safely search personnel array if it exists, or fallback to legacy fields
+          const searchPersonnel = () => {
+             if ((proc as any).personnel) {
+                return (proc as any).personnel.some((per: any) => 
+                  per.name?.toLowerCase().includes(q) || per.role?.toLowerCase().includes(q)
+                );
+             }
+             // Legacy fields check
+             return (
+               proc.judgeName?.toLowerCase().includes(q) ||
+               proc.clerkName?.toLowerCase().includes(q)
+             );
+          };
+
+          if (
+            proc.caseNo?.toLowerCase().includes(q) ||
+            proc.courtName?.toLowerCase().includes(q) ||
+            proc.stageName?.toLowerCase().includes(q) ||
+            searchPersonnel()
+          ) {
+            results.push({ type: 'Proceeding', title: `${proc.stageName} - ${proc.caseNo || 'No Case No'}`, sub: `in ${c.name}`, action: () => navigate('case', c.id) });
+          }
+        });
+      }
     });
 
-    // Search Parties
+    // Search Global Parties
     parties.forEach(p => {
-       if (p.name.toLowerCase().includes(q) || p.idCode.includes(q)) {
+       if (p.name?.toLowerCase().includes(q) || p.idCode?.includes(q)) {
          results.push({ type: 'Party', title: p.name, sub: p.idCode, action: () => navigate('parties') });
        }
     });

@@ -42,26 +42,61 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Load initial data
   useEffect(() => {
-    try {
-      const savedCases = JSON.parse(localStorage.getItem(APP_KEY_CASES) || '[]');
-      const savedParties = JSON.parse(localStorage.getItem(APP_KEY_PARTIES) || '[]');
-      const savedTitle = localStorage.getItem(APP_KEY_TITLE);
-      setCases(savedCases);
-      setParties(savedParties);
-      if (savedTitle) setAppTitleState(savedTitle);
-    } catch (e) {
-      console.error("Failed to load local storage", e);
-    }
+    const loadData = async () => {
+      try {
+        // Try fetching from server first (NAS mode)
+        const res = await fetch('/api/data');
+        if (res.ok) {
+          const data = await res.json();
+          console.log('Loaded data from server:', data);
+          if (data.cases) setCases(data.cases);
+          if (data.parties) setParties(data.parties);
+        } else {
+          throw new Error('Server not available');
+        }
+      } catch (e) {
+        console.log('Server sync failed, falling back to local storage', e);
+        // Fallback to local storage
+        try {
+          const savedCases = JSON.parse(localStorage.getItem(APP_KEY_CASES) || '[]');
+          const savedParties = JSON.parse(localStorage.getItem(APP_KEY_PARTIES) || '[]');
+          const savedTitle = localStorage.getItem(APP_KEY_TITLE);
+          setCases(savedCases);
+          setParties(savedParties);
+          if (savedTitle) setAppTitleState(savedTitle);
+        } catch (err) {
+          console.error("Failed to load local storage", err);
+        }
+      }
+    };
+    loadData();
   }, []);
 
   // Persistence Effects
   useEffect(() => {
     localStorage.setItem(APP_KEY_CASES, JSON.stringify(cases));
+    saveToServer();
+    if (fileHandle) saveToDisk();
   }, [cases]);
 
   useEffect(() => {
     localStorage.setItem(APP_KEY_PARTIES, JSON.stringify(parties));
+    saveToServer();
+    if (fileHandle) saveToDisk();
   }, [parties]);
+
+  // Debounced save to server
+  const saveToServer = async () => {
+    try {
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cases, parties })
+      });
+    } catch (e) {
+      // Silent fail for local-only mode
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem(APP_KEY_TITLE, appTitle);
