@@ -1,33 +1,34 @@
 import React, { useState } from 'react';
 import { useData } from '../store/DataContext';
 import { 
-  Home, Users, Archive, Plus, Search, FileJson, 
-  Briefcase, Scale, MessageSquare, Shield, Folder
+  Home, Users, Archive, Plus, Search, FileJson,
+  Scale, Cloud, CloudOff, AlertTriangle, Settings, PanelLeftClose
 } from 'lucide-react';
 import { cn } from '../utils';
 import { useI18n } from '../store/I18nContext';
 
-export const Sidebar: React.FC<{ onSearch: () => void, onCreateCase: () => void }> = ({ onSearch, onCreateCase }) => {
-  const { cases, activeView, activeCaseId, navigate, appTitle, setAppTitle, exportData, connectLocalFile, fileHandle } = useData();
-  const { t, lang, setLang } = useI18n();
-  const [editingTitle, setEditingTitle] = useState(false);
+interface SidebarProps {
+  onSearch: () => void;
+  onCreateCase: () => void;
+  className?: string;
+  onAfterNavigate?: () => void;
+  onToggleCollapse?: () => void;
+}
 
-  const activeCases = cases.filter(c => c.status !== 'archived');
-  const weight = (s: string) => (s === 'dormant' ? 1 : 0);
-  const groupedCases = {
-    'Litigation': activeCases.filter(c => c.type === '诉讼').sort((a,b) => weight(a.status) - weight(b.status) || a.name.localeCompare(b.name)),
-    'Arbitration': activeCases.filter(c => c.type === '仲裁').sort((a,b) => weight(a.status) - weight(b.status) || a.name.localeCompare(b.name)),
-    'Advisory': activeCases.filter(c => c.type === '常年法律顾问').sort((a,b) => weight(a.status) - weight(b.status) || a.name.localeCompare(b.name)),
-    'Special': activeCases.filter(c => c.type === '专项法律服务').sort((a,b) => weight(a.status) - weight(b.status) || a.name.localeCompare(b.name)),
-    'Dispute': activeCases.filter(c => c.type === '争议解决').sort((a,b) => weight(a.status) - weight(b.status) || a.name.localeCompare(b.name)),
-  };
+export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, className, onAfterNavigate, onToggleCollapse }) => {
+  const { cases, activeView, activeCaseId, navigate, appTitle, setAppTitle, exportData, syncStatus, syncError, lastSyncedAt, isSupabaseEnabled } = useData();
+  const { t } = useI18n();
+  const [editingTitle, setEditingTitle] = useState(false);
+  const activeCases = cases
+    .filter(c => c.status !== 'archived')
+    .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
 
   const NavItem = ({ icon: Icon, label, active, onClick, badge }: any) => (
     <div 
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2 px-3 py-1.5 my-0.5 text-sm rounded-md cursor-pointer transition-colors text-[#5f5e5b] hover:bg-[#efefed]",
-        active && "bg-[#e0e0e0] text-[#37352f] font-medium"
+        "flex items-center gap-2 px-3 py-2 my-0.5 text-sm rounded-xl cursor-pointer transition-colors text-[#4b5563] hover:bg-white/80",
+        active && "bg-white text-strong-theme font-medium shadow-sm"
       )}
     >
       <Icon size={16} />
@@ -38,19 +39,36 @@ export const Sidebar: React.FC<{ onSearch: () => void, onCreateCase: () => void 
 
   const Section = ({ title, children }: any) => (
     <div className="mb-4">
-      <h3 className="px-3 mb-1 text-[11px] font-semibold text-[#9b9a97] uppercase tracking-wide">{title}</h3>
+      <h3 className="px-3 mb-1 text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wide">{title}</h3>
       {children}
     </div>
   );
 
+  const syncBadge = () => {
+    if (!isSupabaseEnabled) {
+      return { icon: CloudOff, text: t('sync.offlineMode'), className: 'text-gray-500' };
+    }
+    if (syncStatus === 'online') {
+      return { icon: Cloud, text: t('sync.online'), className: 'text-[#6a5b75]' };
+    }
+    if (syncStatus === 'syncing') {
+      return { icon: Cloud, text: t('sync.syncing'), className: 'text-[#6b5a8b]' };
+    }
+    return { icon: AlertTriangle, text: t('sync.error'), className: 'text-[#7a4f69]' };
+  };
+
+  const currentSync = syncBadge();
+  const SyncIcon = currentSync.icon;
+  const syncedTimeLabel = lastSyncedAt ? new Date(lastSyncedAt).toLocaleString() : '-';
+
   return (
-    <div className="w-[260px] h-screen bg-[#f7f7f5] border-r border-[#e9e9e7] flex flex-col flex-shrink-0">
+    <div className={cn("w-[292px] h-full craft-surface flex flex-col flex-shrink-0", className)}>
       {/* App Title */}
-      <div className="p-3 h-12 flex items-center justify-between group">
+      <div className="p-3 h-14 flex items-center justify-between group border-b border-[#e3e9f3]">
         {editingTitle ? (
           <input 
             autoFocus
-            className="w-full bg-white px-2 py-1 text-sm rounded border border-blue-500 outline-none"
+            className="w-full bg-white px-2 py-1 text-sm rounded border border-[#8a6d95] outline-none"
             value={appTitle}
             onChange={(e) => setAppTitle(e.target.value)}
             onBlur={() => setEditingTitle(false)}
@@ -59,22 +77,26 @@ export const Sidebar: React.FC<{ onSearch: () => void, onCreateCase: () => void 
         ) : (
           <div 
             onClick={() => setEditingTitle(true)}
-            className="flex items-center gap-2 px-2 py-1 w-full rounded hover:bg-[#efefed] cursor-pointer text-sm font-semibold text-[#37352f] truncate"
+          className="flex items-center gap-2 px-2 py-1.5 w-full rounded-xl hover:bg-white/80 cursor-pointer text-sm font-semibold text-strong-theme truncate"
           >
-            <div className="w-5 h-5 bg-orange-400 rounded flex items-center justify-center text-white text-xs">L</div>
             {appTitle}
           </div>
         )}
-        <div className="ml-2 flex items-center gap-1">
-          <button className={cn("px-2 py-1 text-xs rounded border", lang === 'zh' ? 'bg-black text-white' : 'bg-white')} onClick={() => setLang('zh')}>中文</button>
-          <button className={cn("px-2 py-1 text-xs rounded border", lang === 'en' ? 'bg-black text-white' : 'bg-white')} onClick={() => setLang('en')}>EN</button>
-        </div>
+        {!!onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="ml-2 p-1.5 rounded-lg hover:bg-white/80 text-gray-500 hover:text-gray-700"
+            title="Hide Sidebar"
+          >
+            <PanelLeftClose size={15} />
+          </button>
+        )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto px-2 py-3 scrollbar-hide">
         {/* Core Nav */}
-        <div className="mb-6">
-          <div onClick={onSearch} className="flex items-center gap-2 px-3 py-1.5 my-0.5 text-sm rounded-md cursor-pointer text-[#5f5e5b] hover:bg-[#efefed]">
+        <div className="mb-6 craft-panel p-1.5">
+          <div onClick={onSearch} className="flex items-center gap-2 px-3 py-2 my-0.5 text-sm rounded-xl cursor-pointer text-[#4b5563] hover:bg-white">
             <Search size={16} />
             <span>{t('nav.search')}</span>
             <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-[#efefed] px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
@@ -85,57 +107,72 @@ export const Sidebar: React.FC<{ onSearch: () => void, onCreateCase: () => void 
             icon={Home} 
             label={t('nav.dashboard')} 
             active={activeView === 'dashboard'} 
-            onClick={() => navigate('dashboard')} 
+            onClick={() => {
+              navigate('dashboard');
+              onAfterNavigate?.();
+            }} 
           />
           <NavItem 
             icon={Users} 
             label={t('nav.parties')} 
             active={activeView === 'parties'} 
-            onClick={() => navigate('parties')} 
+            onClick={() => {
+              navigate('parties');
+              onAfterNavigate?.();
+            }} 
           />
           <NavItem 
             icon={Archive} 
             label={t('nav.archives')} 
             active={activeView === 'archives'} 
-            onClick={() => navigate('archives')} 
+            onClick={() => {
+              navigate('archives');
+              onAfterNavigate?.();
+            }} 
+          />
+          <NavItem
+            icon={Settings}
+            label={t('nav.settings')}
+            active={activeView === 'settings'}
+            onClick={() => {
+              navigate('settings');
+              onAfterNavigate?.();
+            }}
           />
         </div>
 
         {/* Case Lists */}
         <Section title={t('nav.activeCases')}>
-          {Object.entries(groupedCases).map(([key, list]) => {
-            if (list.length === 0) return null;
-            let Icon = Briefcase;
-            if (key === 'Litigation') Icon = Scale;
-            if (key === 'Arbitration') Icon = Shield;
-            if (key === 'Advisory') Icon = MessageSquare;
-            
-            return (
-              <div key={key} className="mb-2">
-                <div className="px-3 py-1 text-xs text-[#787774] flex items-center gap-2">
-                  <Icon size={12} /> {key}
-                </div>
-                {list.map(c => (
-                  <div 
-                    key={c.id}
-                    onClick={() => navigate('case', c.id)}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-1 ml-2 text-sm rounded-md cursor-pointer transition-colors text-[#5f5e5b] hover:bg-[#efefed] truncate",
-                      activeCaseId === c.id && "bg-[#e0e0e0] text-[#37352f] font-medium"
-                    )}
-                  >
-                    <span className="truncate">📄 {c.name}</span>
-                    {c.status === 'dormant' && <span className="text-[10px] opacity-50">💤</span>}
-                  </div>
-                ))}
+          <div className="craft-panel p-1.5">
+            {activeCases.map(c => (
+              <div
+                key={c.id}
+                onClick={() => {
+                  navigate('case', c.id);
+                  onAfterNavigate?.();
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-2.5 py-1.5 ml-1 text-sm rounded-xl cursor-pointer transition-colors text-[#4b5563] hover:bg-white truncate",
+                  activeCaseId === c.id && "bg-white text-strong-theme font-medium shadow-sm"
+                )}
+              >
+                <Scale size={13} className="text-gray-400 shrink-0" />
+                <span className="truncate flex-1">{c.name}</span>
+                {c.updatedAt && <span className="text-[10px] text-gray-400 shrink-0">{new Date(c.updatedAt).toLocaleDateString()}</span>}
               </div>
-            );
-          })}
+            ))}
+            {activeCases.length === 0 && (
+              <div className="px-3 py-2 text-xs text-gray-400">No active cases.</div>
+            )}
+          </div>
         </Section>
         
         <div 
-          onClick={onCreateCase}
-          className="flex items-center gap-2 px-3 py-1.5 my-2 text-sm rounded-md cursor-pointer text-[#787774] hover:bg-[#efefed] hover:text-[#37352f]"
+          onClick={() => {
+            onCreateCase();
+            onAfterNavigate?.();
+          }}
+          className="flex items-center gap-2 px-3 py-2 my-2 text-sm rounded-xl cursor-pointer text-[#6b7280] hover:bg-white/80"
         >
           <Plus size={16} />
           <span>{t('nav.newCase')}</span>
@@ -143,21 +180,19 @@ export const Sidebar: React.FC<{ onSearch: () => void, onCreateCase: () => void 
       </div>
 
       {/* Footer / System */}
-      <div className="p-3 border-t border-[#e9e9e7]">
+      <div className="p-3 border-t border-[#e2e8f0] bg-white/40">
         <div className="flex flex-col gap-1">
-          <button 
-            onClick={connectLocalFile}
-            className={cn(
-              "flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-[#efefed] text-[#787774] w-full text-left transition-colors",
-              fileHandle && "text-green-600 bg-green-50 hover:bg-green-100"
-            )}
-          >
-            <Folder size={14} />
-            {fileHandle ? t('footer.linked') : t('footer.link')}
-          </button>
+          <div className={cn("flex items-center gap-2 px-2 py-1.5 text-xs rounded bg-white border border-[#e9e9e7]", currentSync.className)}>
+            <SyncIcon size={14} />
+            <span>{currentSync.text}</span>
+          </div>
+          <div className="px-2 text-[10px] text-[#9b9a97]">
+            {t('sync.lastSynced')}: {syncedTimeLabel}
+          </div>
+          {syncError && <div className="px-2 text-[10px] text-[#7a4f69] truncate">{syncError}</div>}
           <button 
             onClick={exportData}
-            className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-[#efefed] text-[#787774] w-full text左"
+            className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-[#efefed] text-[#787774] w-full text-left"
           >
             <FileJson size={14} />
             {t('footer.backup')}

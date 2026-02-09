@@ -48,6 +48,17 @@ export interface Proceeding {
   secNote?: string;
 }
 
+export interface PropertyPreservation {
+  id: string;
+  caseNo: string;
+  courtName: string;
+  assetDetails: string;
+  judgeName: string;
+  judgeContact: string;
+  deadlineDate: string; // YYYY-MM-DD
+  deadlineId?: string;
+}
+
 export interface TaskSession {
   start: string; // ISO Date
   end: string | null; // ISO Date
@@ -100,6 +111,7 @@ export interface Case {
   name: string;
   type: CaseType;
   status: CaseStatus;
+  updatedAt?: string; // ISO Date
   clientContactName: string;
   clientContactInfo: string;
   specialProjectRemarks: string;
@@ -107,6 +119,7 @@ export interface Case {
   opponents: Party[];
   litigation: {
     proceedings: Proceeding[];
+    propertyPreservations: PropertyPreservation[];
   };
   tasks: Task[];
   logs: Log[];

@@ -6,15 +6,45 @@
     <title>LawyerOS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-      body {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      :root {
+        --ui-bg-0: #f7f4ee;
+        --ui-bg-1: #f5f8fc;
+        --ui-bg-2: #eef3fa;
+        --ui-text: #2B124C;
+        --ui-text-strong: #1f2937;
+        --ui-text-soft: #522B5B;
+        --ui-muted: #6f6377;
+        --ui-accent: #10a37f;
+        --ui-accent-2: #0f8f70;
+        --ui-accent-soft: rgba(16, 163, 127, 0.12);
+        --ui-accent-soft-2: rgba(16, 163, 127, 0.2);
+        --ui-warm: #DFB6B2;
+        --app-font-family: "Sohne", "Söhne", "Segoe UI", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+        
+        --ui-card: #ffffffcc;
+        --ui-line: #dbe4ef;
       }
-      /* Custom Scrollbar for Notion-like feel */
+      * {
+        box-sizing: border-box;
+      }
+      html, body, #root {
+        width: 100%;
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        font-family: var(--app-font-family);
+        color: var(--ui-text);
+        background:
+          radial-gradient(circle at 0% 0%, #fff6e8 0%, rgba(255, 246, 232, 0.7) 25%, rgba(255, 246, 232, 0) 52%),
+          radial-gradient(circle at 100% 0%, #eaf4ff 0%, rgba(234, 244, 255, 0.65) 30%, rgba(234, 244, 255, 0) 58%),
+          radial-gradient(circle at 50% 100%, #edf5ff 0%, rgba(237, 245, 255, 0.55) 30%, rgba(237, 245, 255, 0) 62%),
+          linear-gradient(160deg, var(--ui-bg-0) 0%, var(--ui-bg-1) 50%, var(--ui-bg-2) 100%);
+      }
       ::-webkit-scrollbar { width: 8px; height: 8px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 4px; }
-      ::-webkit-scrollbar-thumb:hover { background: #c0c0c0; }
+      ::-webkit-scrollbar-thumb { background: #cad5e4; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #aab9ce; }
       
       .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -25,12 +55,69 @@
       }
       
       @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(5px); }
+        from { opacity: 0; transform: translateY(8px) scale(0.995); }
         to { opacity: 1; transform: translateY(0); }
       }
       .animate-fade-in {
-        animation: fadeIn 0.3s ease-out forwards;
+        animation: fadeIn 0.24s ease-out forwards;
       }
+      .craft-surface {
+        background: var(--ui-card);
+        border: 1px solid var(--ui-line);
+        backdrop-filter: blur(14px);
+        border-radius: 20px;
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 18px 40px rgba(97, 117, 148, 0.12);
+      }
+      .craft-panel {
+        background: linear-gradient(165deg, rgba(255,255,255,0.86), rgba(248,251,255,0.78));
+        border: 1px solid var(--ui-line);
+        border-radius: 18px;
+      }
+      .craft-pill {
+        border-radius: 9999px;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .craft-tab {
+        border-radius: 9999px;
+        padding: 7px 14px;
+        color: #6b7280;
+        border: 1px solid transparent;
+        transition: all .18s ease;
+        cursor: pointer;
+      }
+      .craft-tab:hover {
+        background: #ffffffb5;
+        color: #1f2937;
+        border-color: #e2e8f0;
+      }
+      .craft-tab-active {
+        background: #ffffff;
+        color: #111827;
+        border-color: #d8e1ef;
+        box-shadow: 0 6px 16px rgba(99, 116, 147, 0.16);
+      }
+      .craft-input {
+        border: 1px solid #d9cfde;
+        background: rgba(255,255,255,0.92);
+        border-radius: 12px;
+      }
+      .tone-ink { color: #2B124C; }
+      .tone-soft { color: var(--ui-accent); }
+      .tone-muted { color: #6f6377; }
+      .tone-accent { color: var(--ui-accent-2); }
+      .bg-accent-soft { background: var(--ui-accent-soft); }
+      .bg-warm-soft { background: #f8eeef; }
+      .accent-bg { background: var(--ui-accent) !important; }
+      .accent-bg-hover:hover { background: var(--ui-accent-2) !important; }
+      .accent-text { color: var(--ui-accent) !important; }
+      .accent-text-2 { color: var(--ui-accent-2) !important; }
+      .accent-border { border-color: var(--ui-accent) !important; }
+      .accent-border-soft { border-color: var(--ui-accent-soft-2) !important; }
+      .accent-soft-bg { background: var(--ui-accent-soft) !important; }
+      .accent-gradient-bg { background-image: linear-gradient(135deg, var(--ui-accent), var(--ui-accent-2)); }
+      .text-strong-theme { color: var(--ui-text-strong) !important; }
     </style>
 </head>
   <body>

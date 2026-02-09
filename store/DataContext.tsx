@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppData, Case, Party } from '../types';
-import { uuid } from '../utils';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Case, Party } from '../types';
+import { nowISO } from '../utils';
+import { isSupabaseConfigured, supabase } from './supabase';
 
 interface DataContextType {
   cases: Case[];
@@ -15,13 +16,18 @@ interface DataContextType {
   deleteParty: (id: string) => void;
   importData: (json: string) => void;
   exportData: () => void;
-  fileHandle: FileSystemFileHandle | null;
-  connectLocalFile: () => Promise<void>;
-  saveToDisk: () => Promise<void>;
-  // Navigation State
-  activeView: 'dashboard' | 'parties' | 'archives' | 'case';
+  syncStatus: 'offline' | 'syncing' | 'online' | 'error';
+  syncError: string | null;
+  lastSyncedAt: string | null;
+  isSupabaseEnabled: boolean;
+  activeView: 'dashboard' | 'parties' | 'archives' | 'case' | 'settings';
   activeCaseId: string | null;
-  navigate: (view: 'dashboard' | 'parties' | 'archives' | 'case', caseId?: string | null) => void;
+  activeCaseTab: 'info' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash';
+  navigate: (
+    view: 'dashboard' | 'parties' | 'archives' | 'case' | 'settings',
+    caseId?: string | null,
+    caseTab?: 'info' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'
+  ) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -30,163 +36,302 @@ const APP_KEY_CASES = 'lawyerCases_v18';
 const APP_KEY_PARTIES = 'lawyerParties_v18';
 const APP_KEY_TITLE = 'lawyerAppTitle_v18';
 
+const normalizeCase = (item: any): Case => ({
+  ...item,
+  updatedAt: item?.updatedAt || '',
+  litigation: {
+    proceedings: Array.isArray(item?.litigation?.proceedings) ? item.litigation.proceedings : [],
+    propertyPreservations: Array.isArray(item?.litigation?.propertyPreservations) ? item.litigation.propertyPreservations : [],
+  },
+  tasks: Array.isArray(item?.tasks) ? item.tasks : [],
+  logs: Array.isArray(item?.logs) ? item.logs : [],
+  reminders: Array.isArray(item?.reminders) ? item.reminders : [],
+  deadlines: Array.isArray(item?.deadlines) ? item.deadlines : [],
+  clients: Array.isArray(item?.clients) ? item.clients : [],
+  opponents: Array.isArray(item?.opponents) ? item.opponents : [],
+});
+
+const parseLocalList = <T,>(key: string): T[] => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cases, setCases] = useState<Case[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
   const [appTitle, setAppTitleState] = useState('⚖️ LawyerOS');
-  const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
 
-  // Navigation State
-  const [activeView, setActiveView] = useState<'dashboard' | 'parties' | 'archives' | 'case'>('dashboard');
+  const [syncStatus, setSyncStatus] = useState<'offline' | 'syncing' | 'online' | 'error'>(
+    isSupabaseConfigured ? 'syncing' : 'offline'
+  );
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [isBootstrapped, setIsBootstrapped] = useState(false);
+
+  const skipNextSyncRef = useRef(false);
+  const saveTimerRef = useRef<number | null>(null);
+  const reloadTimerRef = useRef<number | null>(null);
+
+  const [activeView, setActiveView] = useState<'dashboard' | 'parties' | 'archives' | 'case' | 'settings'>('dashboard');
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
+  const [activeCaseTab, setActiveCaseTab] = useState<'info' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'>('info');
 
-  // Load initial data
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Try fetching from server first (NAS mode)
-        const res = await fetch('/api/data');
-        if (res.ok) {
-          const data = await res.json();
-          console.log('Loaded data from server:', data);
-          if (data.cases) setCases(data.cases);
-          if (data.parties) setParties(data.parties);
-        } else {
-          throw new Error('Server not available');
-        }
-      } catch (e) {
-        console.log('Server sync failed, falling back to local storage', e);
-        // Fallback to local storage
-        try {
-          const savedCases = JSON.parse(localStorage.getItem(APP_KEY_CASES) || '[]');
-          const savedParties = JSON.parse(localStorage.getItem(APP_KEY_PARTIES) || '[]');
-          const savedTitle = localStorage.getItem(APP_KEY_TITLE);
-          setCases(savedCases);
-          setParties(savedParties);
-          if (savedTitle) setAppTitleState(savedTitle);
-        } catch (err) {
-          console.error("Failed to load local storage", err);
-        }
-      }
-    };
-    loadData();
+  const navigate = (
+    view: 'dashboard' | 'parties' | 'archives' | 'case' | 'settings',
+    caseId: string | null = null,
+    caseTab: 'info' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash' = 'info'
+  ) => {
+    setActiveView(view);
+    setActiveCaseId(caseId);
+    if (view === 'case') {
+      setActiveCaseTab(caseTab);
+    } else {
+      setActiveCaseTab('info');
+    }
+  };
+
+  const applyDataset = (nextCases: Case[], nextParties: Party[], fromRemote: boolean) => {
+    if (fromRemote) {
+      skipNextSyncRef.current = true;
+    }
+    setCases(nextCases.map(normalizeCase));
+    setParties(nextParties);
+  };
+
+  const loadFromSupabase = useCallback(async () => {
+    if (!supabase) return false;
+    try {
+      setSyncStatus('syncing');
+      const [casesRes, partiesRes] = await Promise.all([
+        supabase.from('cases').select('id,data').order('updated_at', { ascending: false }),
+        supabase.from('parties').select('id,data').order('updated_at', { ascending: false }),
+      ]);
+
+      if (casesRes.error) throw casesRes.error;
+      if (partiesRes.error) throw partiesRes.error;
+
+      const nextCases = (casesRes.data || []).map((row: any) => normalizeCase({ ...(row.data || {}), id: row.id }));
+      const nextParties = (partiesRes.data || []).map((row: any) => ({ ...(row.data || {}), id: row.id } as Party));
+
+      applyDataset(nextCases, nextParties, true);
+      setSyncStatus('online');
+      setSyncError(null);
+      setLastSyncedAt(nowISO());
+      return true;
+    } catch (error: any) {
+      setSyncStatus('error');
+      setSyncError(error?.message || 'Supabase load failed');
+      return false;
+    }
   }, []);
 
-  // Persistence Effects
-  useEffect(() => {
-    localStorage.setItem(APP_KEY_CASES, JSON.stringify(cases));
-    saveToServer();
-    if (fileHandle) saveToDisk();
-  }, [cases]);
+  const loadFromServerFile = useCallback(async () => {
+    try {
+      const res = await fetch('/api/data');
+      if (!res.ok) return false;
+      const data = await res.json();
+      const nextCases = Array.isArray(data?.cases) ? data.cases.map(normalizeCase) : [];
+      const nextParties = Array.isArray(data?.parties) ? data.parties : [];
+      applyDataset(nextCases, nextParties, false);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const loadFromLocal = useCallback(() => {
+    const savedCases = parseLocalList<Case>(APP_KEY_CASES).map(normalizeCase);
+    const savedParties = parseLocalList<Party>(APP_KEY_PARTIES);
+    const savedTitle = localStorage.getItem(APP_KEY_TITLE);
+    setCases(savedCases);
+    setParties(savedParties);
+    if (savedTitle) setAppTitleState(savedTitle);
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem(APP_KEY_PARTIES, JSON.stringify(parties));
-    saveToServer();
-    if (fileHandle) saveToDisk();
-  }, [parties]);
+    const bootstrap = async () => {
+      const savedTitle = localStorage.getItem(APP_KEY_TITLE);
+      if (savedTitle) setAppTitleState(savedTitle);
 
-  // Debounced save to server
-  const saveToServer = async () => {
+      if (isSupabaseConfigured && supabase) {
+        const loaded = await loadFromSupabase();
+        if (loaded) {
+          setIsBootstrapped(true);
+          return;
+        }
+      }
+
+      const serverLoaded = await loadFromServerFile();
+      if (!serverLoaded) {
+        loadFromLocal();
+      }
+      setIsBootstrapped(true);
+      return;
+    };
+
+    void bootstrap();
+  }, [loadFromLocal, loadFromServerFile, loadFromSupabase]);
+
+  const saveToServerFile = useCallback(async (nextCases: Case[], nextParties: Party[]) => {
     try {
       await fetch('/api/data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cases, parties })
+        body: JSON.stringify({ cases: nextCases, parties: nextParties }),
       });
-    } catch (e) {
-      // Silent fail for local-only mode
+    } catch {
+      // keep local mode silent
     }
-  };
+  }, []);
+
+  const syncToSupabase = useCallback(async (nextCases: Case[], nextParties: Party[]) => {
+    if (!supabase || !isSupabaseConfigured) {
+      await saveToServerFile(nextCases, nextParties);
+      return;
+    }
+
+    try {
+      setSyncStatus('syncing');
+
+      const { error: caseUpsertError } = await supabase.from('cases').upsert(
+        nextCases.map((item) => ({ id: item.id, data: item })),
+        { onConflict: 'id' }
+      );
+      if (caseUpsertError) throw caseUpsertError;
+
+      const { error: partyUpsertError } = await supabase.from('parties').upsert(
+        nextParties.map((item) => ({ id: item.id, data: item })),
+        { onConflict: 'id' }
+      );
+      if (partyUpsertError) throw partyUpsertError;
+
+      const [caseIdsRes, partyIdsRes] = await Promise.all([
+        supabase.from('cases').select('id'),
+        supabase.from('parties').select('id'),
+      ]);
+
+      if (caseIdsRes.error) throw caseIdsRes.error;
+      if (partyIdsRes.error) throw partyIdsRes.error;
+
+      const caseIdSet = new Set(nextCases.map((item) => item.id));
+      const partyIdSet = new Set(nextParties.map((item) => item.id));
+
+      const staleCaseIds = (caseIdsRes.data || []).map((row) => row.id).filter((id) => !caseIdSet.has(id));
+      const stalePartyIds = (partyIdsRes.data || []).map((row) => row.id).filter((id) => !partyIdSet.has(id));
+
+      if (staleCaseIds.length > 0) {
+        const { error } = await supabase.from('cases').delete().in('id', staleCaseIds);
+        if (error) throw error;
+      }
+
+      if (stalePartyIds.length > 0) {
+        const { error } = await supabase.from('parties').delete().in('id', stalePartyIds);
+        if (error) throw error;
+      }
+
+      setSyncStatus('online');
+      setSyncError(null);
+      setLastSyncedAt(nowISO());
+    } catch (error: any) {
+      setSyncStatus('error');
+      setSyncError(error?.message || 'Supabase sync failed');
+    }
+  }, [saveToServerFile]);
+
+  useEffect(() => {
+    localStorage.setItem(APP_KEY_CASES, JSON.stringify(cases));
+    localStorage.setItem(APP_KEY_PARTIES, JSON.stringify(parties));
+
+    if (!isBootstrapped) return;
+
+    if (skipNextSyncRef.current) {
+      skipNextSyncRef.current = false;
+      return;
+    }
+
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      void syncToSupabase(cases, parties);
+    }, 450);
+
+    return () => {
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    };
+  }, [cases, parties, syncToSupabase, isBootstrapped]);
 
   useEffect(() => {
     localStorage.setItem(APP_KEY_TITLE, appTitle);
   }, [appTitle]);
 
-  const setAppTitle = (t: string) => setAppTitleState(t);
+  useEffect(() => {
+    if (!supabase || !isSupabaseConfigured) return;
 
-  const navigate = (view: 'dashboard' | 'parties' | 'archives' | 'case', caseId: string | null = null) => {
-    setActiveView(view);
-    setActiveCaseId(caseId);
-  };
+    const refreshFromRemote = () => {
+      if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = window.setTimeout(() => {
+        void loadFromSupabase();
+      }, 300);
+    };
+
+    const channel = supabase
+      .channel('lawyeros-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cases' }, refreshFromRemote)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'parties' }, refreshFromRemote)
+      .subscribe();
+
+    return () => {
+      if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+      void supabase.removeChannel(channel);
+    };
+  }, [loadFromSupabase]);
+
+  const setAppTitle = (title: string) => setAppTitleState(title);
 
   const updateCase = (updatedCase: Case) => {
-    setCases(prev => prev.map(c => c.id === updatedCase.id ? updatedCase : c));
+    setCases((prev) => prev.map((item) => (item.id === updatedCase.id ? normalizeCase({ ...updatedCase, updatedAt: nowISO() }) : item)));
   };
 
   const addCase = (newCase: Case) => {
-    setCases(prev => [newCase, ...prev]);
+    setCases((prev) => [normalizeCase({ ...newCase, updatedAt: nowISO() }), ...prev]);
   };
 
   const deleteCase = (id: string) => {
-    setCases(prev => prev.filter(c => c.id !== id));
+    setCases((prev) => prev.filter((item) => item.id !== id));
     if (activeCaseId === id) navigate('dashboard');
   };
 
   const updateParty = (updatedParty: Party) => {
-    setParties(prev => prev.map(p => p.id === updatedParty.id ? updatedParty : p));
+    setParties((prev) => prev.map((item) => (item.id === updatedParty.id ? updatedParty : item)));
   };
 
   const addParty = (newParty: Party) => {
-    setParties(prev => [newParty, ...prev]);
+    setParties((prev) => [newParty, ...prev]);
   };
 
   const deleteParty = (id: string) => {
-    setParties(prev => prev.filter(p => p.id !== id));
-  };
-
-  const connectLocalFile = async () => {
-    if ('showOpenFilePicker' in window) {
-      try {
-        const [handle] = await (window as any).showOpenFilePicker({
-          types: [{ description: 'JSON Database', accept: { 'application/json': ['.json'] } }]
-        });
-        setFileHandle(handle);
-        const file = await handle.getFile();
-        const text = await file.text();
-        importData(text);
-        alert(`✅ Connected: ${file.name}`);
-      } catch (err: any) {
-        if (err.name !== 'AbortError') alert("Connection failed.");
-      }
-    } else {
-      alert("Browser not supported. Use Chrome/Edge.");
-    }
-  };
-
-  const saveToDisk = async () => {
-    if (fileHandle) {
-      try {
-        const writable = await (fileHandle as any).createWritable();
-        await writable.write(JSON.stringify({ cases, parties }, null, 2));
-        await writable.close();
-      } catch (e) {
-        console.error(e);
-        alert("Failed to write to file.");
-      }
-    }
+    setParties((prev) => prev.filter((item) => item.id !== id));
   };
 
   const importData = (jsonStr: string) => {
     try {
       const data = JSON.parse(jsonStr);
-      const importedCases = Array.isArray(data) ? data : (data.cases || []);
+      const importedCases = (Array.isArray(data) ? data : (data.cases || [])).map(normalizeCase);
       const importedParties = Array.isArray(data) ? [] : (data.parties || []);
-      
-      // Simple migration check
-      importedCases.forEach((c: any) => {
-          if(!c.litigation) c.litigation = { proceedings: [] };
-          if(!c.tasks) c.tasks = [];
-      });
-
       setCases(importedCases);
       setParties(importedParties);
-    } catch (e) {
-      alert("Invalid JSON format");
+    } catch {
+      alert('Invalid JSON format');
     }
   };
 
   const exportData = () => {
-    const blob = new Blob([JSON.stringify({ cases, parties }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ cases, parties }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -195,14 +340,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <DataContext.Provider value={{
-      cases, parties, appTitle, setAppTitle,
-      updateCase, addCase, deleteCase,
-      updateParty, addParty, deleteParty,
-      importData, exportData,
-      fileHandle, connectLocalFile, saveToDisk,
-      activeView, activeCaseId, navigate
-    }}>
+    <DataContext.Provider
+      value={{
+        cases,
+        parties,
+        appTitle,
+        setAppTitle,
+        updateCase,
+        addCase,
+        deleteCase,
+        updateParty,
+        addParty,
+        deleteParty,
+        importData,
+        exportData,
+        syncStatus,
+        syncError,
+        lastSyncedAt,
+        isSupabaseEnabled: isSupabaseConfigured,
+        activeView,
+        activeCaseId,
+        activeCaseTab,
+        navigate,
+      }}
+    >
       {children}
     </DataContext.Provider>
   );
@@ -210,6 +371,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useData = () => {
   const context = useContext(DataContext);
-  if (!context) throw new Error("useData must be used within a DataProvider");
+  if (!context) throw new Error('useData must be used within a DataProvider');
   return context;
 };

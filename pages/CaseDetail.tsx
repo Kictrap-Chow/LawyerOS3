@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../store/DataContext';
 import { useI18n } from '../store/I18nContext';
-import { Case, Task, Log, Reminder, Deadline, Party, Proceeding } from '../types';
+import { Case, Task, Log, Reminder, Deadline, Party, Proceeding, PropertyPreservation } from '../types';
 import { calculateTaskDuration, formatTimeDuration, nowISO, uuid, formatDateTime } from '../utils';
 import { 
   Play, Pause, CheckCircle, RotateCcw, Plus, Trash2, Calendar, 
@@ -10,12 +10,12 @@ import {
 
 const StatusBadge = ({ status }: { status: string }) => {
   const colors = {
-    active: 'bg-green-100 text-green-700 border-green-200',
-    dormant: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    archived: 'bg-gray-100 text-gray-600 border-gray-200'
+    active: 'bg-[#efe7f2] text-[#5b4f78] border-[#d8c8e1]',
+    dormant: 'bg-[#f6ecef] text-[#7a4f69] border-[#e6d3da]',
+    archived: 'bg-[#efeaf0] text-[#655a67] border-[#d8d0dc]'
   };
   return (
-    <span className={`px-2 py-0.5 rounded text-xs border ${colors[status as keyof typeof colors] || colors.active} uppercase font-medium`}>
+    <span className={`px-2.5 py-1 rounded-full text-xs border ${colors[status as keyof typeof colors] || colors.active} uppercase font-semibold tracking-wide`}>
       {status}
     </span>
   );
@@ -46,7 +46,7 @@ const PartySelector = ({
       <div className="bg-white rounded-lg shadow-xl w-[400px] max-w-[95vw] max-h-[80vh] overflow-y-auto p-4 animate-fade-in" onClick={e => e.stopPropagation()}>
         <h3 className="font-bold text-lg mb-4">Select or Create Party</h3>
         <input 
-          className="w-full border border-gray-300 rounded p-2 mb-4 text-sm outline-none focus:border-blue-500"
+          className="w-full border border-gray-300 rounded p-2 mb-4 text-sm outline-none focus:border-[#8a6d95]"
           placeholder="Search parties..."
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -56,7 +56,7 @@ const PartySelector = ({
           {filtered.map(p => (
             <div 
               key={p.id} 
-              className="p-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-50 last:border-0"
+              className="p-2 hover:bg-[#f4edf8] cursor-pointer text-sm border-b border-gray-50 last:border-0"
               onClick={() => onSelect(p)}
             >
               <div className="font-medium">{p.name}</div>
@@ -67,7 +67,7 @@ const PartySelector = ({
         </div>
         <div className="flex justify-end gap-2">
            <button onClick={onCancel} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
-           <button onClick={() => onSelect({ id: uuid(), name: search, type: 'company', idCode: '', address: '' })} className="px-3 py-1.5 text-sm bg-black text-white rounded hover:bg-gray-800">Create "{search}"</button>
+           <button onClick={() => onSelect({ id: uuid(), name: search, type: 'company', idCode: '', address: '' })} className="px-3 py-1.5 text-sm accent-bg accent-bg-hover text-white rounded">Create "{search}"</button>
         </div>
       </div>
     </div>
@@ -81,6 +81,7 @@ interface TaskItemProps {
 }
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
+  const { t } = useI18n();
   const [duration, setDuration] = useState(calculateTaskDuration(task));
   const [showManualInput, setShowManualInput] = useState(false);
   // Manual entry state
@@ -202,15 +203,15 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
   };
 
   return (
-    <div className={`group flex flex-col sm:flex-row gap-3 p-3 mb-2 rounded border transition-all ${task.isRunning ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+    <div className={`group flex flex-col sm:flex-row gap-3 p-3 mb-2 rounded border transition-all ${task.isRunning ? 'bg-[#f4edf8] border-[#dbcde6] shadow-sm' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
       <div className="flex-1 space-y-2">
         <div className="flex items-center gap-2">
-          {task.isCompleted && <CheckCircle size={16} className="text-green-500" />}
+          {task.isCompleted && <CheckCircle size={16} className="text-[#6a5b75]" />}
           <input 
             className={`font-medium text-sm bg-transparent outline-none w-full ${task.isCompleted ? 'text-gray-400 line-through' : 'text-gray-800'}`}
             value={task.desc}
             onChange={(e) => onUpdate({ ...task, desc: e.target.value })}
-            placeholder="Task description..."
+            placeholder={t('tasks.taskDescription')}
             disabled={task.isCompleted}
           />
         </div>
@@ -225,14 +226,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
           </select>
           <input 
             className="bg-transparent text-gray-500 outline-none w-24" 
-            placeholder="Assignee"
+            placeholder={t('tasks.assignee')}
             value={task.assignee}
             onChange={(e) => onUpdate({...task, assignee: e.target.value})}
           />
         </div>
         <textarea 
            className="w-full text-xs text-gray-500 bg-transparent outline-none resize-none h-auto overflow-hidden placeholder-gray-300" 
-           placeholder="Notes..."
+           placeholder={t('tasks.notes')}
            rows={1}
            value={task.notes}
            onChange={(e) => onUpdate({...task, notes: e.target.value})}
@@ -242,18 +243,18 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
       <div className="flex sm:flex-col items-center justify-between sm:justify-center gap-2 min-w-[100px]">
         {task.isCompleted ? (
            <div className="text-center">
-             <div className="text-xs font-bold text-green-600">Done</div>
-             <button onClick={() => onUpdate({...task, isCompleted: false})} className="text-[10px] underline text-gray-400 hover:text-blue-500 flex items-center gap-1 mt-1">
-               <RotateCcw size={10} /> Reopen
+             <div className="text-xs font-bold text-[#6a5b75]">{t('tasks.done')}</div>
+             <button onClick={() => onUpdate({...task, isCompleted: false})} className="text-[10px] underline text-gray-400 hover:text-[#6b5a8b] flex items-center gap-1 mt-1">
+               <RotateCcw size={10} /> {t('tasks.reopen')}
              </button>
            </div>
         ) : (
           <>
-            <div className="font-mono text-lg font-semibold text-gray-700 cursor-help" title="Total duration">{formatTimeDuration(duration)}</div>
+            <div className="font-mono text-lg font-semibold text-[#4f445a] cursor-help" title="Total duration">{formatTimeDuration(duration)}</div>
             <div className="flex gap-1 w-full items-center justify-center">
               <button 
                 onClick={toggleTimer}
-                className={`flex-1 flex items-center justify-center p-1 rounded text-white text-xs transition-colors ${task.isRunning ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-500 hover:bg-blue-600'}`}
+                className="flex-1 flex items-center justify-center p-1 rounded text-white text-xs transition-colors accent-bg accent-bg-hover"
               >
                 {task.isRunning ? <Pause size={14} /> : <Play size={14} />}
               </button>
@@ -261,49 +262,21 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
               <div className="relative">
                   <button 
                     onClick={() => setShowManualInput(!showManualInput)} 
-                    className={`p-1 rounded hover:bg-blue-100 hover:text-blue-600 transition-colors ${showManualInput ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
+                    className={`p-1 rounded hover:bg-[#efe6f5] hover:text-[#6b5a8b] transition-colors ${showManualInput ? 'bg-[#efe6f5] text-[#6b5a8b]' : 'bg-gray-100 text-gray-600'}`}
                     title="Add/Subtract Time"
                     type="button"
                   >
                     <Clock size={14} />
                   </button>
-                  
-                  {showManualInput && (
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-white shadow-xl border border-gray-200 p-3 rounded z-20 w-64 max-w-[95vw] animate-fade-in">
-                       <div className="text-xs font-bold text-gray-700 mb-2">Add Manual Session</div>
-                       <div className="space-y-2">
-                          <div>
-                            <label className="text-[10px] text-gray-500 block mb-1">Start Time</label>
-                            <input 
-                              type="datetime-local"
-                              className="w-full border border-gray-300 rounded px-2 py-1 text-xs outline-none focus:border-blue-500"
-                              value={manualStart}
-                              onChange={e => setManualStart(e.target.value)}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-gray-500 block mb-1">End Time</label>
-                            <input 
-                              type="datetime-local"
-                              className="w-full border border-gray-300 rounded px-2 py-1 text-xs outline-none focus:border-blue-500"
-                              value={manualEnd}
-                              onChange={e => setManualEnd(e.target.value)}
-                            />
-                          </div>
-                          <button onClick={handleManualSubmit} className="w-full bg-blue-600 text-white py-1 rounded text-xs hover:bg-blue-700 mt-2">Add Session</button>
-                       </div>
-                       <div className="mt-2 text-[10px] text-gray-400 text-center cursor-pointer hover:text-gray-600 underline" onClick={() => setShowManualInput(false)}>Cancel</div>
-                    </div>
-                  )}
               </div>
 
-              <button onClick={completeTask} className="p-1 rounded bg-gray-100 hover:bg-green-100 text-gray-600 hover:text-green-600 transition-colors">
+              <button onClick={completeTask} className="p-1 rounded bg-gray-100 hover:bg-[#f0e8f2] text-gray-600 hover:text-[#6a5b75] transition-colors">
                 <CheckCircle size={14} />
               </button>
             </div>
           </>
         )}
-         <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all absolute top-2 right-2 sm:static">
+         <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-[#7a4f69] transition-all absolute top-2 right-2 sm:static">
              <Trash2 size={12} />
         </button>
       </div>
@@ -313,7 +286,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
           className={`text-xs px-2 py-1 rounded border ${showSessions ? 'bg-gray-100' : 'bg-white'}`}
           onClick={() => setShowSessions(!showSessions)}
         >
-          Sessions
+          {t('tasks.sessions')}
         </button>
         {showSessions && (
           <div className="mt-2 space-y-2">
@@ -341,24 +314,53 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
                   {!s.end && (
                     <button
                       type="button"
-                      className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+                      className="text-xs px-2 py-1 rounded accent-bg accent-bg-hover text-white"
                       onClick={() => endSessionNow(idx)}
-                    >End Now</button>
+                    >{t('tasks.endNow')}</button>
                   )}
                   <button
                     type="button"
-                    className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 border border-red-200 hover:bg-red-100"
+                    className="text-xs px-2 py-1 rounded bg-[#f8eeef] text-[#7a4f69] border border-[#e2c7d1] hover:bg-[#f2e4e9]"
                     onClick={() => deleteSession(idx)}
                   >Delete</button>
                 </div>
               </div>
             ))}
             {(task.sessions || []).length === 0 && (
-              <div className="text-xs text-gray-400">No sessions yet.</div>
+              <div className="text-xs text-gray-400">{t('tasks.noSessions')}</div>
             )}
           </div>
         )}
       </div>
+      {showManualInput && (
+        <div className="fixed inset-0 z-[140] bg-black/20 backdrop-blur-[2px] flex items-center justify-center p-3" onClick={() => setShowManualInput(false)}>
+          <div className="craft-surface w-[360px] max-w-[95vw] p-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="text-xs font-bold text-[#4f445a] mb-2">{t('tasks.manualSession')}</div>
+            <div className="space-y-2">
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-1">{t('tasks.startTime')}</label>
+                <input
+                  type="datetime-local"
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs outline-none focus:border-[#8a6d95]"
+                  value={manualStart}
+                  onChange={e => setManualStart(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-1">{t('tasks.endTime')}</label>
+                <input
+                  type="datetime-local"
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs outline-none focus:border-[#8a6d95]"
+                  value={manualEnd}
+                  onChange={e => setManualEnd(e.target.value)}
+                />
+              </div>
+              <button onClick={handleManualSubmit} className="w-full accent-bg accent-bg-hover text-white py-1 rounded text-xs mt-2">{t('tasks.addSession')}</button>
+            </div>
+            <div className="mt-2 text-[10px] text-gray-400 text-center cursor-pointer hover:text-gray-600 underline" onClick={() => setShowManualInput(false)}>{t('actions.cancel')}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -366,6 +368,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
 const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c: Case, editing: boolean, onDraftUpdate: (c: Case) => void, onCommitUpdate: (c: Case) => void, allParties: Party[] }) => {
   const [showPartySelector, setShowPartySelector] = useState<'client' | 'opponent' | null>(null);
   const { addParty, updateParty, parties } = useData();
+  const { t } = useI18n();
 
   const handlePartyUpdate = (isClient: boolean, id: string, field: keyof Party, value: string) => {
     const list = isClient ? c.clients : c.opponents;
@@ -424,6 +427,96 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
       }
   };
 
+  const preservationDeadlineTitle = (item: PropertyPreservation) => {
+    const suffix = item.caseNo?.trim() || item.courtName?.trim();
+    return suffix ? `${t('preservation.deadlinePrefix')} - ${suffix}` : t('preservation.deadlinePrefix');
+  };
+
+  const syncPreservationDeadlines = (nextCase: Case): Case => {
+    let deadlines = [...(nextCase.deadlines || [])];
+    const propertyPreservations = (nextCase.litigation.propertyPreservations || []).map(item => ({ ...item }));
+
+    const syncedPreservations = propertyPreservations.map((item) => {
+      if (!item.deadlineDate) {
+        if (item.deadlineId) {
+          deadlines = deadlines.filter(d => d.id !== item.deadlineId);
+        }
+        return { ...item, deadlineId: undefined };
+      }
+
+      const title = preservationDeadlineTitle(item);
+      if (item.deadlineId && deadlines.some(d => d.id === item.deadlineId)) {
+        deadlines = deadlines.map(d => d.id === item.deadlineId ? { ...d, title, date: item.deadlineDate } : d);
+        return item;
+      }
+
+      const newDeadlineId = uuid();
+      deadlines = [...deadlines, { id: newDeadlineId, title, date: item.deadlineDate, completed: false }];
+      return { ...item, deadlineId: newDeadlineId };
+    });
+
+    return {
+      ...nextCase,
+      deadlines,
+      litigation: {
+        ...nextCase.litigation,
+        propertyPreservations: syncedPreservations
+      }
+    };
+  };
+
+  const handleAddPreservation = () => {
+    if (!editing) return;
+    const newItem: PropertyPreservation = {
+      id: uuid(),
+      caseNo: '',
+      courtName: '',
+      assetDetails: '',
+      judgeName: '',
+      judgeContact: '',
+      deadlineDate: ''
+    };
+    const nextCase: Case = {
+      ...c,
+      litigation: {
+        ...c.litigation,
+        propertyPreservations: [...(c.litigation.propertyPreservations || []), newItem]
+      }
+    };
+    onDraftUpdate(nextCase);
+  };
+
+  const handleUpdatePreservation = (id: string, field: keyof PropertyPreservation, value: string) => {
+    if (!editing) return;
+    const nextCase: Case = {
+      ...c,
+      litigation: {
+        ...c.litigation,
+        propertyPreservations: (c.litigation.propertyPreservations || []).map(item =>
+          item.id === id ? { ...item, [field]: value } : item
+        )
+      }
+    };
+    onDraftUpdate(syncPreservationDeadlines(nextCase));
+  };
+
+  const handleRemovePreservation = (id: string) => {
+    if (!editing) return;
+    const target = (c.litigation.propertyPreservations || []).find(item => item.id === id);
+    let deadlines = [...(c.deadlines || [])];
+    if (target?.deadlineId) {
+      deadlines = deadlines.filter(d => d.id !== target.deadlineId);
+    }
+    onDraftUpdate({
+      ...c,
+      deadlines,
+      litigation: {
+        ...c.litigation,
+        propertyPreservations: (c.litigation.propertyPreservations || []).filter(item => item.id !== id)
+      }
+    });
+  };
+
   return (
     <>
     {showPartySelector && (
@@ -443,17 +536,17 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
            onCancel={() => setShowPartySelector(null)}
         />
     )}
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in pb-20">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 animate-fade-in pb-20">
       <div className="space-y-6">
         {/* Client Info */}
-        <div className="bg-white p-4 rounded-lg border border-[#e9e9e7] shadow-sm group">
+        <div className="craft-panel p-4 shadow-sm group">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><MessageSquare size={14}/> Client Information</h3>
-            <button onClick={() => addPartyToCase(true)} className="text-xs text-blue-600 hover:underline">+ Add Client</button>
+            <h3 className="text-xs font-bold text-[#6f6377] uppercase flex items-center gap-2"><MessageSquare size={14}/>{t('info.client')}</h3>
+            <button onClick={() => addPartyToCase(true)} className="text-xs text-[#6b5a8b] hover:underline">{t('info.addClient')}</button>
           </div>
           {c.clients.map(p => (
              <div key={p.id} className="mb-4 last:mb-0 pb-4 border-b border-gray-50 last:border-0 relative">
-               <button disabled={!editing} onClick={() => removeParty(true, p.id)} className={`absolute right-0 top-0 ${editing ? 'text-gray-300 hover:text-red-500' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>
+               <button disabled={!editing} onClick={() => removeParty(true, p.id)} className={`absolute right-0 top-0 ${editing ? 'text-gray-300 hover:text-[#7a4f69]' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>
                <div className="flex gap-2 mb-2">
                   <select 
                     className="text-lg bg-transparent outline-none cursor-pointer"
@@ -465,58 +558,58 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
                     <option value="individual">👤</option>
                   </select>
                   <input 
-                    className="font-medium text-[#37352f] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none w-full transition-colors"
-                    placeholder="Client Name"
+                    className="font-medium text-[#3f2f4d] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none w-full transition-colors"
+                    placeholder={t('info.client')}
                     value={p.name}
                     onChange={(e) => handlePartyUpdate(true, p.id, 'name', e.target.value)}
                     disabled={!editing}
                   />
                </div>
-               <div className="grid grid-cols-2 gap-2 mb-2">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                  <input 
-                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-blue-200"
-                    placeholder="ID/Credit Code"
+                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
+                    placeholder={t('info.idCode')}
                     value={p.idCode || ''}
                     onChange={(e) => handlePartyUpdate(true, p.id, 'idCode', e.target.value)}
                     disabled={!editing}
                  />
                  <input 
-                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-blue-200"
-                    placeholder="Address"
+                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
+                    placeholder={t('info.address')}
                     value={p.address || ''}
                     onChange={(e) => handlePartyUpdate(true, p.id, 'address', e.target.value)}
                     disabled={!editing}
                  />
                </div>
                <input 
-                  className="w-full text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-blue-200"
-                  placeholder="Remarks / Notes"
+                  className="w-full text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
+                  placeholder={t('info.remarks')}
                   value={p.note || ''}
                   onChange={(e) => handlePartyUpdate(true, p.id, 'note', e.target.value)}
                   disabled={!editing}
               />
              </div>
           ))}
-          {c.clients.length === 0 && <div className="text-sm text-gray-400 italic py-2 text-center">No clients added.</div>}
+          {c.clients.length === 0 && <div className="text-sm text-gray-400 italic py-2 text-center">{t('detail.noClients')}</div>}
           
-          <div className="mt-4 pt-4 border-t border-gray-100 text-sm">
-             <div className="grid grid-cols-2 gap-4">
+          <div className="mt-4 pt-4 border-t border-[#e8dfeb] text-sm">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Contact Person</label>
+                  <label className="block text-xs text-[#8a8092] mb-1">{t('info.contactPerson')}</label>
                   <input 
-                    className="w-full text-gray-800 border-b border-transparent hover:border-gray-200 focus:border-blue-500 outline-none bg-transparent"
-                    placeholder="Name"
+                    className="w-full text-[#3f2f4d] border-b border-transparent hover:border-gray-200 focus:border-[#8a6d95] outline-none bg-transparent"
+                    placeholder={t('info.contactPerson')}
                     value={c.clientContactName || ''}
-                    onChange={(e) => onUpdate({...c, clientContactName: e.target.value})}
+                    onChange={(e) => editing && onDraftUpdate({...c, clientContactName: e.target.value})}
                   />
                </div>
                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Contact Info</label>
+                  <label className="block text-xs text-[#8a8092] mb-1">{t('info.contactInfo')}</label>
                   <input 
-                    className="w-full text-gray-800 border-b border-transparent hover:border-gray-200 focus:border-blue-500 outline-none bg-transparent"
-                    placeholder="Phone/Email"
+                    className="w-full text-[#3f2f4d] border-b border-transparent hover:border-gray-200 focus:border-[#8a6d95] outline-none bg-transparent"
+                    placeholder={t('info.contactInfo')}
                     value={c.clientContactInfo || ''}
-                    onChange={(e) => onUpdate({...c, clientContactInfo: e.target.value})}
+                    onChange={(e) => editing && onDraftUpdate({...c, clientContactInfo: e.target.value})}
                   />
                </div>
              </div>
@@ -524,14 +617,14 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
         </div>
 
         {/* Opponent Info */}
-        <div className="bg-white p-4 rounded-lg border border-[#e9e9e7] shadow-sm group">
+        <div className="craft-panel p-4 shadow-sm group">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><Scale size={14}/> Opponent Information</h3>
-            <button onClick={() => addPartyToCase(false)} className="text-xs text-blue-600 hover:underline">+ Add Opponent</button>
+            <h3 className="text-xs font-bold text-[#6f6377] uppercase flex items-center gap-2"><Scale size={14}/>{t('info.opponent')}</h3>
+            <button onClick={() => addPartyToCase(false)} className="text-xs text-[#6b5a8b] hover:underline">{t('info.addOpponent')}</button>
           </div>
           {c.opponents.map(p => (
              <div key={p.id} className="mb-4 last:mb-0 pb-4 border-b border-gray-50 last:border-0 relative">
-               <button disabled={!editing} onClick={() => removeParty(false, p.id)} className={`absolute right-0 top-0 ${editing ? 'text-gray-300 hover:text-red-500' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>
+               <button disabled={!editing} onClick={() => removeParty(false, p.id)} className={`absolute right-0 top-0 ${editing ? 'text-gray-300 hover:text-[#7a4f69]' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>
                <div className="flex gap-2 mb-2">
                   <select 
                     className="text-lg bg-transparent outline-none cursor-pointer"
@@ -543,173 +636,263 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
                     <option value="individual">👤</option>
                   </select>
                   <input 
-                    className="font-medium text-[#37352f] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none w-full transition-colors"
-                    placeholder="Opponent Name"
+                    className="font-medium text-[#3f2f4d] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none w-full transition-colors"
+                    placeholder={t('info.opponent')}
                     value={p.name}
                     onChange={(e) => handlePartyUpdate(false, p.id, 'name', e.target.value)}
                     disabled={!editing}
                   />
                </div>
-               <div className="grid grid-cols-2 gap-2 mb-2">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                  <input 
-                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-blue-200"
-                    placeholder="ID/Credit Code"
+                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
+                    placeholder={t('info.idCode')}
                     value={p.idCode || ''}
                     onChange={(e) => handlePartyUpdate(false, p.id, 'idCode', e.target.value)}
                     disabled={!editing}
                  />
                  <input 
-                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-blue-200"
-                    placeholder="Address"
+                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
+                    placeholder={t('info.address')}
                     value={p.address || ''}
                     onChange={(e) => handlePartyUpdate(false, p.id, 'address', e.target.value)}
                     disabled={!editing}
                  />
                </div>
                <input 
-                  className="w-full text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-blue-200"
-                  placeholder="Remarks / Notes"
+                  className="w-full text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
+                  placeholder={t('info.remarks')}
                   value={p.note || ''}
                   onChange={(e) => handlePartyUpdate(false, p.id, 'note', e.target.value)}
                   disabled={!editing}
               />
              </div>
           ))}
-          {c.opponents.length === 0 && <div className="text-sm text-gray-400 italic py-2 text-center">No opponents added.</div>}
+          {c.opponents.length === 0 && <div className="text-sm text-gray-400 italic py-2 text-center">{t('detail.noOpponents')}</div>}
         </div>
       </div>
 
       <div className="space-y-6">
          {/* Proceedings */}
          {(c.type === '诉讼' || c.type === '仲裁') && (
-           <div className="bg-white p-4 rounded-lg border border-[#e9e9e7] shadow-sm">
+           <div className="craft-panel p-4 shadow-sm">
               <div className="flex justify-between items-center mb-3">
-                <h3 className="text-xs font-bold text-gray-500 uppercase">Proceedings</h3>
+                <h3 className="text-xs font-bold text-[#6f6377] uppercase">{t('proceedings.title')}</h3>
                 <button 
                   onClick={() => {
                     const newProc: Proceeding = {
-                      id: uuid(), stageName: 'New Stage', myRole: '', caseNo: '', courtName: '', courtAddress: '',
+                      id: uuid(), stageName: '', myRole: '', caseNo: '', courtName: '', courtAddress: '',
                       personnel: []
                     };
                     onCommitUpdate({ ...c, litigation: { ...c.litigation, proceedings: [...c.litigation.proceedings, newProc] } });
                   }}
-                  className="text-xs text-blue-600 hover:underline"
-                >+ Add Stage</button>
+                  className="text-xs text-[#6b5a8b] hover:underline"
+                >{t('proceedings.addStage')}</button>
               </div>
               
               {c.litigation.proceedings.map((proc, idx) => (
                 <div key={proc.id} className="mb-6 last:mb-0 pb-6 border-b border-gray-100 last:border-0 relative">
-                   <div className="flex justify-between items-start mb-3">
-                      <div className="flex gap-2 items-center">
-                        <input 
-                          className="font-bold text-sm bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none w-32"
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2 items-end">
+                      <div>
+                        <label className="block text-[10px] text-[#8a8092] mb-1">{t('proceedings.stage')}</label>
+                        <input
+                          className="w-full font-semibold text-sm bg-white/90 border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
                           value={proc.stageName}
                           onChange={(e) => handleProcUpdate(proc.id, 'stageName', e.target.value)}
                           disabled={!editing}
-                          placeholder="Stage"
+                          placeholder={t('proceedings.stage')}
                         />
-                        <input 
-                           className="text-xs text-gray-500 bg-gray-50 rounded border-none outline-none py-1 px-2"
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-[#8a8092] mb-1">{t('proceedings.myRole')}</label>
+                        <input
+                           className="w-full text-sm text-[#6f6377] bg-[#f3edf5] rounded border border-[#ddd2e3] outline-none py-1.5 px-2 focus:border-[#8a6d95]"
                            value={proc.myRole}
                            onChange={(e) => handleProcUpdate(proc.id, 'myRole', e.target.value)}
-                           placeholder="客户地位"
+                           placeholder={t('proceedings.myRole')}
                            disabled={!editing}
                         />
                       </div>
-                      <div className="flex items-center gap-2">
-                         <input 
-                           className="text-xs font-mono bg-gray-50 px-2 py-1 rounded border border-transparent hover:border-gray-300 focus:border-blue-500 outline-none w-40 text-right"
+                   </div>
+                   <div className="mb-3">
+                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('proceedings.caseNo')}</label>
+                     <div className="flex items-center gap-2 w-full">
+                         <input
+                           className="text-xs font-mono bg-gray-50 px-2 py-1.5 rounded border border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none w-full text-left"
                            value={proc.caseNo}
                            onChange={(e) => handleProcUpdate(proc.id, 'caseNo', e.target.value)}
                            disabled={!editing}
-                           placeholder="Case No."
+                           placeholder={t('proceedings.caseNo')}
                          />
                          {idx > 0 && <button disabled={!editing} onClick={() => {
                             const updated = c.litigation.proceedings.filter(p => p.id !== proc.id);
                             onCommitUpdate({ ...c, litigation: { ...c.litigation, proceedings: updated } });
-                         }} className={`${editing ? 'text-gray-300 hover:text-red-500' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>}
-                      </div>
+                         }} className={`${editing ? 'text-gray-300 hover:text-[#7a4f69]' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>}
+                   </div>
                    </div>
 
                    <div className="space-y-3">
                       <div className="grid grid-cols-1 gap-2">
                         <div className="flex items-center gap-2">
-                           <span className="text-xs text-gray-400 w-16">Institution</span>
+                           <span className="text-xs text-gray-400 w-16">{t('proceedings.institution')}</span>
                            <input 
-                             className="flex-1 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-blue-500 outline-none py-1"
+                             className="flex-1 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
                              value={proc.courtName}
                              onChange={(e) => handleProcUpdate(proc.id, 'courtName', e.target.value)}
                              disabled={!editing}
-                             placeholder="Court / Arbitration Comm."
+                             placeholder={t('proceedings.court')}
                            />
                         </div>
                         <div className="flex items-center gap-2">
-                           <span className="text-xs text-gray-400 w-16">Address</span>
+                           <span className="text-xs text-gray-400 w-16">{t('proceedings.address')}</span>
                            <input 
-                             className="flex-1 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-blue-500 outline-none py-1"
+                             className="flex-1 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
                              value={proc.courtAddress}
                              onChange={(e) => handleProcUpdate(proc.id, 'courtAddress', e.target.value)}
                              disabled={!editing}
-                             placeholder="Address"
+                             placeholder={t('proceedings.address')}
                            />
                         </div>
                       </div>
                       
                       {/* Personnel List */}
-                      <div className="bg-gray-50 rounded p-2">
+                      <div className="bg-[#f7f2f8] rounded p-2 border border-[#e6dcec]">
                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase">Personnel</span>
-                            <button onClick={() => handleAddPerson(proc.id)} className="text-[10px] text-blue-600 hover:underline">+ Add Person</button>
+                            <span className="text-[10px] font-bold text-[#8a8092] uppercase">{t('proceedings.personnel')}</span>
+                            <button onClick={() => handleAddPerson(proc.id)} className="text-[10px] text-[#6b5a8b] hover:underline">+ Add Person</button>
                          </div>
                          {(proc.personnel || []).map((per: any) => (
-                            <div key={per.id} className="flex gap-2 items-center mb-2 last:mb-0 group">
+                            <div key={per.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center mb-2 last:mb-0 group">
                                <input 
-                                 className="w-20 text-xs bg-white border border-gray-200 rounded px-1 py-0.5 outline-none"
+                                 className="sm:col-span-2 text-xs bg-white border border-gray-200 rounded px-1 py-1 outline-none"
                                  value={per.role}
                                  onChange={(e) => handleUpdatePerson(proc.id, per.id, 'role', e.target.value)}
                                  disabled={!editing}
                                  placeholder="Role"
                                />
                                <input 
-                                 className="flex-1 text-xs bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none"
+                                 className="sm:col-span-3 text-xs bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
                                  value={per.name}
                                  onChange={(e) => handleUpdatePerson(proc.id, per.id, 'name', e.target.value)}
                                  disabled={!editing}
                                  placeholder="Name"
                                />
                                <input 
-                                 className="w-24 text-xs bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none"
+                                 className="sm:col-span-3 text-xs bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
                                  value={per.contact}
                                  onChange={(e) => handleUpdatePerson(proc.id, per.id, 'contact', e.target.value)}
                                  disabled={!editing}
                                  placeholder="Contact"
                                />
                                <input 
-                                 className="flex-1 text-xs bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none"
+                                 className="sm:col-span-3 text-xs bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
                                  value={per.note || ''}
                                  onChange={(e) => handleUpdatePerson(proc.id, per.id, 'note', e.target.value)}
                                  disabled={!editing}
                                  placeholder="Notes"
                                />
-                               <button disabled={!editing} onClick={() => handleRemovePerson(proc.id, per.id)} className={`${editing ? 'opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={12}/></button>
+                               <button disabled={!editing} onClick={() => handleRemovePerson(proc.id, per.id)} className={`sm:col-span-1 justify-self-end ${editing ? 'opacity-70 sm:opacity-0 sm:group-hover:opacity-100 text-gray-300 hover:text-[#7a4f69]' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={12}/></button>
                             </div>
                          ))}
-                         {(proc.personnel || []).length === 0 && <div className="text-xs text-gray-400 italic text-center py-2">No personnel added.</div>}
+                         {(proc.personnel || []).length === 0 && <div className="text-xs text-gray-400 italic text-center py-2">{t('proceedings.noPersonnel')}</div>}
                       </div>
                    </div>
                 </div>
               ))}
            </div>
          )}
+
+         {c.type === '诉讼' && (
+           <div className="craft-panel p-4 shadow-sm">
+             <div className="flex justify-between items-center mb-3">
+               <h3 className="text-xs font-bold text-[#6f6377] uppercase">{t('preservation.title')}</h3>
+               <button onClick={handleAddPreservation} className="text-xs text-[#6b5a8b] hover:underline">{t('preservation.add')}</button>
+             </div>
+
+             {(c.litigation.propertyPreservations || []).map((item) => (
+               <div key={item.id} className="mb-4 last:mb-0 p-3 rounded-xl border border-[#e6dcec] bg-[#f7f2f8]">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                   <div>
+                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('preservation.caseNo')}</label>
+                     <input
+                       className="w-full text-xs bg-white border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                       value={item.caseNo}
+                       onChange={(e) => handleUpdatePreservation(item.id, 'caseNo', e.target.value)}
+                       disabled={!editing}
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('preservation.court')}</label>
+                     <input
+                       className="w-full text-xs bg-white border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                       value={item.courtName}
+                       onChange={(e) => handleUpdatePreservation(item.id, 'courtName', e.target.value)}
+                       disabled={!editing}
+                     />
+                   </div>
+                   <div className="md:col-span-2">
+                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('preservation.assets')}</label>
+                     <input
+                       className="w-full text-xs bg-white border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                       value={item.assetDetails}
+                       onChange={(e) => handleUpdatePreservation(item.id, 'assetDetails', e.target.value)}
+                       disabled={!editing}
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('preservation.deadline')}</label>
+                     <input
+                       type="date"
+                       className="w-full text-xs bg-white border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                       value={item.deadlineDate || ''}
+                       onChange={(e) => handleUpdatePreservation(item.id, 'deadlineDate', e.target.value)}
+                       disabled={!editing}
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('preservation.judge')}</label>
+                     <input
+                       className="w-full text-xs bg-white border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                       value={item.judgeName}
+                       onChange={(e) => handleUpdatePreservation(item.id, 'judgeName', e.target.value)}
+                       disabled={!editing}
+                     />
+                   </div>
+                   <div className="md:col-span-2">
+                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('preservation.judgeContact')}</label>
+                     <div className="flex items-center gap-2">
+                       <input
+                         className="w-full text-xs bg-white border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                         value={item.judgeContact}
+                         onChange={(e) => handleUpdatePreservation(item.id, 'judgeContact', e.target.value)}
+                         disabled={!editing}
+                       />
+                       <button
+                         disabled={!editing}
+                         onClick={() => handleRemovePreservation(item.id)}
+                         className={`${editing ? 'text-gray-300 hover:text-[#7a4f69]' : 'text-gray-200 cursor-not-allowed'}`}
+                       >
+                         <Trash2 size={14}/>
+                       </button>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             ))}
+             {(c.litigation.propertyPreservations || []).length === 0 && (
+               <div className="text-sm text-gray-400 italic py-2 text-center">{t('preservation.noItems')}</div>
+             )}
+           </div>
+         )}
          
          {/* Special Project Scope */}
          {(c.type === '专项法律服务' || c.type === '常年法律顾问') && (
-           <div className="bg-white p-4 rounded-lg border border-[#e9e9e7] shadow-sm">
-              <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Project Scope</h3>
+           <div className="craft-panel p-4 shadow-sm">
+              <h3 className="text-xs font-bold text-[#6f6377] uppercase mb-3">{t('detail.projectScope')}</h3>
               <textarea 
-                className="w-full text-sm text-gray-700 min-h-[150px] border border-transparent hover:border-gray-200 focus:border-blue-500 rounded p-2 outline-none resize-y"
+                className="w-full text-sm text-[#4f445a] min-h-[150px] border border-transparent hover:border-gray-200 focus:border-[#8a6d95] rounded p-2 outline-none resize-y"
                 value={c.specialProjectRemarks || ''}
-                onChange={(e) => onUpdate({...c, specialProjectRemarks: e.target.value})}
+                onChange={(e) => editing && onDraftUpdate({...c, specialProjectRemarks: e.target.value})}
                 placeholder="Describe the project scope, goals, and deliverables..."
               />
            </div>
@@ -723,7 +906,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
 // --- Main Component ---
 
 export const CaseDetail: React.FC = () => {
-  const { cases, activeCaseId, updateCase, deleteCase, navigate, parties } = useData();
+  const { cases, activeCaseId, activeCaseTab, updateCase, deleteCase, navigate, parties } = useData();
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'>('info');
   const currentCase = cases.find(c => c.id === activeCaseId);
@@ -739,10 +922,11 @@ export const CaseDetail: React.FC = () => {
     if (currentCase) {
       setDraftCase(currentCase);
       setIsEditing(false);
+      setActiveTab(activeCaseTab || 'info');
     }
-  }, [currentCase?.id]);
+  }, [currentCase?.id, activeCaseTab]);
 
-  if (!currentCase) return <div className="p-8 text-center text-gray-500">Case not found.</div>;
+  if (!currentCase) return <div className="p-8 text-center text-gray-500">{t('detail.caseNotFound')}</div>;
 
   const getTrash = () => currentCase.trash || { tasks: [], logs: [], reminders: [], deadlines: [] };
 
@@ -817,9 +1001,13 @@ export const CaseDetail: React.FC = () => {
     const item = currentCase.deadlines.find(d => d.id === id);
     if (item) {
        const trash = getTrash();
+       const updatedPreservations = (currentCase.litigation.propertyPreservations || []).map(p =>
+        p.deadlineId === id ? { ...p, deadlineId: undefined, deadlineDate: '' } : p
+       );
        updateCase({
          ...currentCase,
          deadlines: currentCase.deadlines.filter(d => d.id !== id),
+         litigation: { ...currentCase.litigation, propertyPreservations: updatedPreservations },
          trash: { ...trash, deadlines: [item, ...trash.deadlines] }
        });
     }
@@ -871,34 +1059,34 @@ export const CaseDetail: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col craft-surface">
       {/* Header */}
-      <div className="px-8 py-6 border-b border-[#e9e9e7] sticky top-0 bg-white/80 backdrop-blur-md z-10 flex justify-between items-start">
+      <div className="px-3 md:px-8 py-3 md:py-5 border-b border-[#e2e8f0] sticky top-0 bg-[#f8fbff]/85 backdrop-blur-xl z-10 flex flex-col lg:flex-row justify-between lg:items-start gap-3 md:gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 mb-2 text-sm text-slate-500">
              <span className="cursor-pointer hover:underline" onClick={() => navigate('dashboard')}>{t('breadcrumbs.dashboard')}</span> / <span>{t('breadcrumbs.cases')}</span>
           </div>
-          <h1 className="text-3xl font-bold text-[#37352f] flex items-center gap-3">
+          <h1 className="text-xl md:text-3xl font-bold text-[#1f2937] flex items-center gap-2 md:gap-3">
             {currentCase.name}
             <StatusBadge status={currentCase.status} />
           </h1>
-          <div className="text-sm text-gray-500 mt-1 flex gap-4">
+          <div className="text-xs md:text-sm text-slate-500 mt-1 flex gap-3 flex-wrap">
              <span>{currentCase.type}</span>
-             <span>• Created {currentCase.id.substring(0, 8)}...</span>
+             {currentCase.updatedAt && <span>• Updated {new Date(currentCase.updatedAt).toLocaleString()}</span>}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 sm:flex gap-2">
            {!isEditing ? (
-             <button onClick={() => { setIsEditing(true); setDraftCase(currentCase); }} className="px-3 py-1.5 border border-gray-200 rounded text-sm hover:bg-gray-50">{t('actions.edit')}</button>
+             <button onClick={() => { setIsEditing(true); setDraftCase(currentCase); }} className="px-3 py-1.5 border border-[#d9e1ed] bg-white rounded-xl text-sm hover:bg-gray-50">{t('actions.edit')}</button>
            ) : (
-             <button onClick={() => { if (draftCase) updateCase(draftCase); setIsEditing(false); }} className="px-3 py-1.5 border border-gray-200 rounded text-sm hover:bg-gray-50 bg-black text-white">{t('actions.saveChanges')}</button>
+           <button onClick={() => { if (draftCase) updateCase(draftCase); setIsEditing(false); }} className="px-3 py-1.5 border accent-border rounded-xl text-sm accent-bg accent-bg-hover text-white">{t('actions.saveChanges')}</button>
            )}
            <button 
              onClick={() => setShowDeleteConfirm(true)}
-             className="px-3 py-1.5 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50"
+             className="px-3 py-1.5 border border-[#d6b8c6] text-[#7a4f69] rounded-xl text-sm hover:bg-[#f8eeef]"
            >{t('actions.deleteCase')}</button>
            <select 
-             className="px-3 py-1.5 border border-gray-200 rounded text-sm hover:bg-gray-50 outline-none cursor-pointer"
+             className="px-3 py-1.5 border border-[#d9e1ed] bg-white rounded-xl text-sm hover:bg-gray-50 outline-none cursor-pointer"
              value={currentCase.status}
              onChange={handleStatusChange}
            >
@@ -910,12 +1098,12 @@ export const CaseDetail: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="px-8 border-b border-[#e9e9e7] flex gap-6 text-sm">
+      <div className="px-3 md:px-8 py-2.5 border-b border-[#e2e8f0] flex gap-2 text-sm overflow-x-auto scrollbar-hide snap-x snap-mandatory">
         {['info', 'tasks', 'schedule', 'deadlines', 'logs', 'trash'].map(tab => (
           <div 
             key={tab}
             onClick={() => setActiveTab(tab as any)}
-            className={`py-3 cursor-pointer border-b-2 transition-colors capitalize ${activeTab === tab ? 'border-black text-black font-medium' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+            className={`craft-tab capitalize whitespace-nowrap snap-start ${activeTab === tab ? 'craft-tab-active font-medium' : ''}`}
           >
             {tab === 'trash' ? t('tabs.trash') : t(`tabs.${tab}`)}
           </div>
@@ -923,7 +1111,7 @@ export const CaseDetail: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-8 bg-gray-50/30">
+      <div className="flex-1 overflow-y-auto p-2.5 md:p-8 pb-24 md:pb-8 bg-gradient-to-b from-[#f8fbff]/70 to-[#f4f8ff]/45">
         <div className="max-w-5xl mx-auto">
           
           {activeTab === 'info' && draftCase && (
@@ -938,9 +1126,9 @@ export const CaseDetail: React.FC = () => {
 
           {activeTab === 'tasks' && (
             <div className="animate-fade-in">
-              <div className="flex justify-between items-center mb-4">
-                 <h3 className="font-bold text-gray-700">{t('tasks.title')} ({currentCase.tasks.length})</h3>
-                 <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-4">
+                 <h3 className="font-bold text-[#4f445a]">{t('tasks.title')} ({currentCase.tasks.length})</h3>
+                 <div className="flex gap-2 w-full sm:w-auto">
                     <button 
                       onClick={() => {
                         const headers = ['Date', 'Start Time', 'End Time', 'Description', 'Duration (Hrs)', 'Notes', 'Assignee'];
@@ -984,17 +1172,17 @@ export const CaseDetail: React.FC = () => {
                         link.download = `${currentCase.name}_Billing.csv`;
                         link.click();
                     }}
-                      className="flex items-center gap-1 border border-gray-200 text-gray-600 px-3 py-1.5 rounded text-sm hover:bg-gray-50"
+                      className="flex-1 sm:flex-none items-center justify-center flex gap-1 border border-gray-200 text-gray-600 px-3 py-1.5 rounded text-sm hover:bg-gray-50"
                     >
                       <FileText size={16} /> {t('tasks.export')}
                     </button>
-                    <button onClick={handleAddTask} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 shadow-sm">
+                    <button onClick={handleAddTask} className="flex-1 sm:flex-none flex items-center justify-center gap-1 accent-bg accent-bg-hover text-white px-3 py-1.5 rounded text-sm shadow-sm">
                       <Plus size={16} /> {t('tasks.add')}
                     </button>
                  </div>
               </div>
               <div className="space-y-1">
-                {currentCase.tasks.length === 0 ? <div className="text-center py-10 text-gray-400 border-2 border-dashed rounded-lg">No tasks yet. Create one!</div> : 
+                {currentCase.tasks.length === 0 ? <div className="text-center py-10 text-gray-400 border-2 border-dashed rounded-lg">{t('tasks.noTasksYet')}</div> : 
                   currentCase.tasks.map(t => (
                     <TaskItem key={t.id} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} />
                   ))
@@ -1005,10 +1193,10 @@ export const CaseDetail: React.FC = () => {
 
           {activeTab === 'logs' && (
              <div className="animate-fade-in max-w-3xl">
-               <div className="mb-6 flex gap-2">
-                 <textarea 
+              <div className="mb-6 flex flex-col sm:flex-row gap-2">
+                 <textarea
                    id="logInput"
-                   className="w-full border border-gray-300 rounded p-3 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                   className="w-full border border-[#d9cfde] rounded-xl p-3 text-sm bg-white/90 text-[#3f2f4d] focus:ring-2 focus:ring-[#e7d9ee] outline-none"
                    placeholder={t('logs.placeholder')}
                    rows={2}
                    onKeyDown={(e) => {
@@ -1025,20 +1213,20 @@ export const CaseDetail: React.FC = () => {
                        handleAddLog(el.value);
                        el.value = '';
                     }}
-                    className="bg-gray-800 text-white px-4 rounded hover:bg-black transition-colors"
+                    className="accent-bg accent-bg-hover text-white px-4 py-2 rounded transition-colors sm:self-auto self-end"
                  >{t('logs.post')}</button>
                </div>
-               <div className="space-y-6 relative border-l border-gray-200 ml-4 pl-8">
+               <div className="space-y-6 relative border-l border-[#ddd2e3] ml-4 pl-8">
                  {currentCase.logs.map(log => (
                    <div key={log.id} className="relative group">
-                     <div className="absolute -left-[39px] top-1 h-5 w-5 rounded-full bg-white border-2 border-gray-300 z-10"></div>
+                     <div className="absolute -left-[39px] top-1 h-5 w-5 rounded-full bg-white border-2 border-[#d2c3da] z-10"></div>
                      <div className="text-xs text-gray-400 mb-1">{formatDateTime(log.date)}</div>
-                     <div className="bg-white p-3 rounded border border-gray-200 text-sm shadow-sm text-gray-800 whitespace-pre-wrap">
+                     <div className="bg-white/92 p-3 rounded-xl border border-[#ddd2e3] text-sm shadow-sm text-[#3f2f4d] whitespace-pre-wrap">
                        {log.content}
                      </div>
                      <button 
                        onClick={() => handleDeleteLog(log.id)}
-                       className="absolute top-0 right-0 p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                       className="absolute top-0 right-0 p-2 text-gray-300 hover:text-[#7a4f69] opacity-0 group-hover:opacity-100 transition-opacity"
                      >
                        <Trash2 size={12}/>
                      </button>
@@ -1050,22 +1238,22 @@ export const CaseDetail: React.FC = () => {
 
           {activeTab === 'schedule' && (
             <div className="animate-fade-in">
-              <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg mb-6 flex items-end gap-2">
+              <div className="bg-[#f4edf8] border border-[#dbcde6] p-4 rounded-lg mb-6 flex flex-col sm:flex-row sm:items-end gap-2">
                <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
                  <div className="col-span-2">
-                     <label className="block text-xs text-blue-700 font-bold mb-1">{t('schedule.newEvent')}</label>
-                     <input id="sch-title" placeholder={t('schedule.eventPlaceholder')} className="w-full text-sm p-2 rounded border border-blue-200 outline-none" />
+                     <label className="block text-xs text-[#5b4f78] font-bold mb-1">{t('schedule.newEvent')}</label>
+                     <input id="sch-title" placeholder={t('schedule.eventPlaceholder')} className="w-full text-sm p-2 rounded border border-[#dbcde6] outline-none" />
                  </div>
                  <div>
-                     <label className="block text-xs text-blue-700 font-bold mb-1">{t('schedule.dateTime')}</label>
+                     <label className="block text-xs text-[#5b4f78] font-bold mb-1">{t('schedule.dateTime')}</label>
                     <div className="flex gap-1">
-                       <input id="sch-date" type="date" className="w-full text-sm p-2 rounded border border-blue-200 outline-none" />
-                       <input id="sch-time" type="time" className="w-24 text-sm p-2 rounded border border-blue-200 outline-none" />
+                       <input id="sch-date" type="date" className="w-full text-sm p-2 rounded border border-[#dbcde6] outline-none" />
+                       <input id="sch-time" type="time" className="w-24 text-sm p-2 rounded border border-[#dbcde6] outline-none" />
                     </div>
                  </div>
                </div>
                 <button 
-                  className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 shadow-sm h-[38px]"
+                  className="accent-bg accent-bg-hover text-white px-4 py-2 rounded text-sm shadow-sm h-[38px] w-full sm:w-auto"
                   onClick={() => {
                    const t = (document.getElementById('sch-title') as HTMLInputElement).value;
                    const d = (document.getElementById('sch-date') as HTMLInputElement).value;
@@ -1081,38 +1269,38 @@ export const CaseDetail: React.FC = () => {
 
               <div className="space-y-2">
                 {currentCase.reminders.sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time)).map(r => (
-                  <div key={r.id} className="flex items-center justify-between p-3 rounded border bg-white border-blue-200 shadow-sm">
+                  <div key={r.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl border bg-white/92 border-[#dbcde6] shadow-sm">
                     {editingReminderId === r.id ? (
                       <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end mr-4">
                         <div>
-                          <label className="block text-[10px] text-gray-500 mb-1">Title</label>
-                          <input className="w-full text-sm p-2 rounded border border-gray-200 outline-none" value={remEditTitle} onChange={e => setRemEditTitle(e.target.value)} />
+                          <label className="block text-[10px] text-[#7a7083] mb-1">Title</label>
+                          <input className="w-full text-sm p-2 rounded border border-[#ddd2e3] outline-none text-[#3f2f4d]" value={remEditTitle} onChange={e => setRemEditTitle(e.target.value)} />
                         </div>
                         <div>
-                          <label className="block text-[10px] text-gray-500 mb-1">Date</label>
-                          <input type="date" className="w-full text-sm p-2 rounded border border-gray-200 outline-none" value={remEditDate} onChange={e => setRemEditDate(e.target.value)} />
+                          <label className="block text-[10px] text-[#7a7083] mb-1">Date</label>
+                          <input type="date" className="w-full text-sm p-2 rounded border border-[#ddd2e3] outline-none text-[#3f2f4d]" value={remEditDate} onChange={e => setRemEditDate(e.target.value)} />
                         </div>
                         <div>
-                          <label className="block text-[10px] text-gray-500 mb-1">Time</label>
-                          <input type="time" className="w-full text-sm p-2 rounded border border-gray-200 outline-none" value={remEditTime} onChange={e => setRemEditTime(e.target.value)} />
+                          <label className="block text-[10px] text-[#7a7083] mb-1">Time</label>
+                          <input type="time" className="w-full text-sm p-2 rounded border border-[#ddd2e3] outline-none text-[#3f2f4d]" value={remEditTime} onChange={e => setRemEditTime(e.target.value)} />
                         </div>
                       </div>
                     ) : (
                       <div className="flex items-center gap-4">
                         <div className="text-center min-w-[60px]">
-                          <div className="text-xs text-gray-500 uppercase font-bold">{new Date(r.date).toLocaleString('default', { month: 'short' })}</div>
-                          <div className="text-xl font-bold text-gray-800 leading-none">{new Date(r.date).getDate()}</div>
+                          <div className="text-xs text-[#7a7083] uppercase font-bold">{new Date(r.date).toLocaleString('default', { month: 'short' })}</div>
+                          <div className="text-xl font-bold text-[#3f2f4d] leading-none">{new Date(r.date).getDate()}</div>
                           <div className="text-xs text-gray-400">{r.time}</div>
                         </div>
-                        <div className="h-8 w-px bg-gray-200"></div>
-                        <div className="font-medium text-sm text-gray-800">{r.title}</div>
+                        <div className="h-8 w-px bg-[#ddd2e3]"></div>
+                        <div className="font-medium text-sm text-[#3f2f4d]">{r.title}</div>
                       </div>
                     )}
                     <div className="flex items-center gap-2">
                       {editingReminderId === r.id ? (
                         <>
                           <button 
-                            className="text-sm px-3 py-1 border rounded hover:bg-gray-50"
+                            className="text-sm px-3 py-1 border border-[#ddd2e3] rounded hover:bg-white"
                             onClick={() => {
                               const newReminders = currentCase.reminders.map(x => x.id === r.id ? { ...x, title: remEditTitle, date: remEditDate, time: remEditTime || x.time } : x);
                               updateCase({ ...currentCase, reminders: newReminders });
@@ -1123,17 +1311,17 @@ export const CaseDetail: React.FC = () => {
                             }}
                           >Save</button>
                           <button 
-                            className="text-sm px-3 py-1 border rounded hover:bg-gray-50"
+                            className="text-sm px-3 py-1 border border-[#ddd2e3] rounded hover:bg-white"
                             onClick={() => { setEditingReminderId(null); }}
                           >Cancel</button>
                         </>
                       ) : (
                         <>
                           <button 
-                            className="text-gray-400 hover:text-blue-600"
+                            className="text-gray-400 hover:text-[#6b5a8b]"
                             onClick={() => { setEditingReminderId(r.id); setRemEditTitle(r.title); setRemEditDate(r.date); setRemEditTime(r.time); }}
                           ><Edit2 size={14}/></button>
-                          <button onClick={() => handleDeleteReminder(r.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={14}/></button>
+                          <button onClick={() => handleDeleteReminder(r.id)} className="text-gray-300 hover:text-[#7a4f69]"><Trash2 size={14}/></button>
                         </>
                       )}
                     </div>
@@ -1146,14 +1334,14 @@ export const CaseDetail: React.FC = () => {
 
           {activeTab === 'deadlines' && (
             <div className="animate-fade-in">
-              <div className="bg-red-50 border border-red-100 p-4 rounded-lg mb-6 flex items-end gap-2">
+              <div className="bg-[#f8eeef] border border-[#e7d2d8] p-4 rounded-lg mb-6 flex flex-col sm:flex-row sm:items-end gap-2">
                 <div className="flex-1">
-                  <label className="block text-xs text-red-700 font-bold mb-1">{t('deadlines.new')}</label>
-                  <input id="dl-title" placeholder="Description (e.g. Evidence Submission)" className="w-full text-sm p-2 rounded border border-red-200 outline-none mb-2" />
-                  <input id="dl-date" type="date" className="w-full text-sm p-2 rounded border border-red-200 outline-none" />
+                  <label className="block text-xs text-[#7a4f69] font-bold mb-1">{t('deadlines.new')}</label>
+                  <input id="dl-title" placeholder="Description (e.g. Evidence Submission)" className="w-full text-sm p-2 rounded border border-[#e2c7d1] outline-none mb-2" />
+                  <input id="dl-date" type="date" className="w-full text-sm p-2 rounded border border-[#e2c7d1] outline-none" />
                 </div>
                 <button 
-                  className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700 shadow-sm"
+                  className="bg-[#7a4f69] text-white px-4 py-2 rounded text-sm hover:bg-[#683f56] shadow-sm w-full sm:w-auto"
                   onClick={() => {
                     const t = (document.getElementById('dl-title') as HTMLInputElement).value;
                     const d = (document.getElementById('dl-date') as HTMLInputElement).value;
@@ -1167,7 +1355,7 @@ export const CaseDetail: React.FC = () => {
 
               <div className="space-y-2">
                 {currentCase.deadlines.map(dl => (
-                  <div key={dl.id} className={`flex items-center justify-between p-3 rounded border ${dl.completed ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-white border-red-200 shadow-sm'}`}>
+                  <div key={dl.id} className={`flex items-center justify-between p-3 rounded-xl border ${dl.completed ? 'bg-[#f5f1f6] border-[#ddd2e3] opacity-70' : 'bg-white/92 border-[#e2c7d1] shadow-sm'}`}>
                     <div className="flex items-center gap-3">
                        <input 
                          type="checkbox" 
@@ -1176,14 +1364,14 @@ export const CaseDetail: React.FC = () => {
                             const newDLs = currentCase.deadlines.map(x => x.id === dl.id ? {...x, completed: !x.completed} : x);
                             updateCase({...currentCase, deadlines: newDLs});
                          }}
-                         className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                         className="w-4 h-4 rounded border-gray-300 text-[#7a4f69] focus:ring-[#d6b8c6]"
                        />
                        <div>
-                         <div className={`font-medium text-sm ${dl.completed ? 'line-through text-gray-500' : 'text-gray-800'}`}>{dl.title}</div>
-                         <div className="text-xs text-red-500 font-mono">{dl.date}</div>
+                         <div className={`font-medium text-sm ${dl.completed ? 'line-through text-[#847b8d]' : 'text-[#3f2f4d]'}`}>{dl.title}</div>
+                         <div className="text-xs text-[#7a4f69] font-mono">{dl.date}</div>
                        </div>
                     </div>
-                    <button onClick={() => handleDeleteDeadline(dl.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={14}/></button>
+                    <button onClick={() => handleDeleteDeadline(dl.id)} className="text-gray-300 hover:text-[#7a4f69]"><Trash2 size={14}/></button>
                   </div>
                 ))}
               </div>
@@ -1192,17 +1380,17 @@ export const CaseDetail: React.FC = () => {
 
           {activeTab === 'trash' && (
             <div className="animate-fade-in">
-               <h3 className="font-bold text-gray-700 mb-4">Recycle Bin</h3>
+               <h3 className="font-bold text-[#4f445a] mb-4">Recycle Bin</h3>
                <div className="space-y-6">
                   {/* Tasks */}
                   <div>
-                     <h4 className="text-sm font-bold text-gray-600 mb-2 flex items-center gap-2"><CheckCircle size={14}/> Deleted Tasks</h4>
+                     <h4 className="text-sm font-bold text-[#6f6377] mb-2 flex items-center gap-2"><CheckCircle size={14}/> Deleted Tasks</h4>
                      {getTrash().tasks.length === 0 ? <div className="text-xs text-gray-400 italic">No deleted tasks.</div> : 
                        <div className="space-y-2">
                          {getTrash().tasks.map(t => (
-                           <div key={t.id} className="flex justify-between items-center p-2 bg-gray-50 border border-gray-200 rounded">
-                              <span className="text-sm text-gray-600 line-through">{t.desc}</span>
-                              <button onClick={() => handleRestore('task', t.id)} className="text-xs text-blue-600 hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
+                           <div key={t.id} className="flex justify-between items-center p-2 bg-[#f5f1f6] border border-[#ddd2e3] rounded-xl">
+                              <span className="text-sm text-[#7a7083] line-through">{t.desc}</span>
+                              <button onClick={() => handleRestore('task', t.id)} className="text-xs text-[#6b5a8b] hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
                            </div>
                          ))}
                        </div>
@@ -1210,13 +1398,13 @@ export const CaseDetail: React.FC = () => {
                   </div>
                   {/* Logs */}
                   <div>
-                     <h4 className="text-sm font-bold text-gray-600 mb-2 flex items-center gap-2"><FileText size={14}/> Deleted Logs</h4>
+                     <h4 className="text-sm font-bold text-[#6f6377] mb-2 flex items-center gap-2"><FileText size={14}/> Deleted Logs</h4>
                      {getTrash().logs.length === 0 ? <div className="text-xs text-gray-400 italic">No deleted logs.</div> : 
                        <div className="space-y-2">
                          {getTrash().logs.map(l => (
-                           <div key={l.id} className="flex justify-between items-center p-2 bg-gray-50 border border-gray-200 rounded">
-                              <span className="text-sm text-gray-600 truncate max-w-[300px]">{l.content}</span>
-                              <button onClick={() => handleRestore('log', l.id)} className="text-xs text-blue-600 hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
+                           <div key={l.id} className="flex justify-between items-center p-2 bg-[#f5f1f6] border border-[#ddd2e3] rounded-xl">
+                              <span className="text-sm text-[#7a7083] truncate max-w-[300px]">{l.content}</span>
+                              <button onClick={() => handleRestore('log', l.id)} className="text-xs text-[#6b5a8b] hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
                            </div>
                          ))}
                        </div>
@@ -1224,13 +1412,13 @@ export const CaseDetail: React.FC = () => {
                   </div>
                   {/* Schedule */}
                   <div>
-                     <h4 className="text-sm font-bold text-gray-600 mb-2 flex items-center gap-2"><Calendar size={14}/> Deleted Schedule</h4>
+                     <h4 className="text-sm font-bold text-[#6f6377] mb-2 flex items-center gap-2"><Calendar size={14}/> Deleted Schedule</h4>
                      {getTrash().reminders.length === 0 ? <div className="text-xs text-gray-400 italic">No deleted schedule items.</div> : 
                        <div className="space-y-2">
                          {getTrash().reminders.map(r => (
-                           <div key={r.id} className="flex justify-between items-center p-2 bg-gray-50 border border-gray-200 rounded">
-                              <span className="text-sm text-gray-600">{r.title} ({r.date})</span>
-                              <button onClick={() => handleRestore('reminder', r.id)} className="text-xs text-blue-600 hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
+                           <div key={r.id} className="flex justify-between items-center p-2 bg-[#f5f1f6] border border-[#ddd2e3] rounded-xl">
+                              <span className="text-sm text-[#7a7083]">{r.title} ({r.date})</span>
+                              <button onClick={() => handleRestore('reminder', r.id)} className="text-xs text-[#6b5a8b] hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
                            </div>
                          ))}
                        </div>
@@ -1238,13 +1426,13 @@ export const CaseDetail: React.FC = () => {
                   </div>
                   {/* Deadlines */}
                   <div>
-                     <h4 className="text-sm font-bold text-gray-600 mb-2 flex items-center gap-2"><AlertTriangle size={14}/> Deleted Deadlines</h4>
+                     <h4 className="text-sm font-bold text-[#6f6377] mb-2 flex items-center gap-2"><AlertTriangle size={14}/> Deleted Deadlines</h4>
                      {getTrash().deadlines.length === 0 ? <div className="text-xs text-gray-400 italic">No deleted deadlines.</div> : 
                        <div className="space-y-2">
                          {getTrash().deadlines.map(d => (
-                           <div key={d.id} className="flex justify-between items-center p-2 bg-gray-50 border border-gray-200 rounded">
-                              <span className="text-sm text-gray-600">{d.title} ({d.date})</span>
-                              <button onClick={() => handleRestore('deadline', d.id)} className="text-xs text-blue-600 hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
+                           <div key={d.id} className="flex justify-between items-center p-2 bg-[#f5f1f6] border border-[#ddd2e3] rounded-xl">
+                              <span className="text-sm text-[#7a7083]">{d.title} ({d.date})</span>
+                              <button onClick={() => handleRestore('deadline', d.id)} className="text-xs text-[#6b5a8b] hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
                            </div>
                          ))}
                        </div>
@@ -1258,13 +1446,13 @@ export const CaseDetail: React.FC = () => {
       </div>
 
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-[420px] max-w-[95vw] p-6" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-3" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="craft-surface w-[420px] max-w-[95vw] p-6" onClick={e => e.stopPropagation()}>
             <div className="text-lg font-bold mb-2">确认删除案件</div>
-            <div className="text-sm text-gray-600 mb-4">此操作将移除该案件并返回仪表盘。请确认。</div>
+            <div className="text-sm text-[#6f6377] mb-4">此操作将移除该案件并返回仪表盘。请确认。</div>
             <div className="flex justify-end gap-2">
-              <button className="px-3 py-1.5 border rounded text-sm" onClick={() => setShowDeleteConfirm(false)}>取消</button>
-              <button className="px-3 py-1.5 border border-red-300 text-white bg-red-600 rounded text-sm hover:bg-red-700" onClick={() => { setShowDeleteConfirm(false); deleteCase(currentCase.id); }}>确认删除</button>
+              <button className="px-3 py-1.5 border border-[#ddd2e3] rounded text-sm" onClick={() => setShowDeleteConfirm(false)}>取消</button>
+              <button className="px-3 py-1.5 border border-[#d6b8c6] text-white bg-[#7a4f69] rounded text-sm hover:bg-[#683f56]" onClick={() => { setShowDeleteConfirm(false); deleteCase(currentCase.id); }}>确认删除</button>
             </div>
           </div>
         </div>

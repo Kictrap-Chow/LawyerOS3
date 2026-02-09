@@ -99,8 +99,8 @@ export const GlobalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   }
 
   return (
-    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[100] flex items-start justify-center pt-[15vh]" onClick={onClose}>
-      <div className="bg-white w-[600px] max-w-[90vw] rounded-xl shadow-2xl overflow-hidden animate-fade-in border border-gray-200" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-[100] flex items-start justify-center pt-[10vh] px-3" onClick={onClose}>
+      <div className="bg-white/90 w-[640px] max-w-[95vw] rounded-3xl shadow-2xl overflow-hidden animate-fade-in border border-white backdrop-blur-xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center px-4 py-4 border-b border-gray-100">
           <Search className="text-gray-400 mr-3" size={20} />
           <input 
@@ -111,7 +111,7 @@ export const GlobalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) => 
             onChange={e => setQuery(e.target.value)}
           />
         </div>
-        <div className="max-h-[60vh] overflow-y-auto bg-[#fafafa]">
+        <div className="max-h-[65vh] overflow-y-auto bg-[#f8fafc]">
           {results.length > 0 ? (
             <div className="py-2">
               {results.slice(0, 10).map((r, i) => (

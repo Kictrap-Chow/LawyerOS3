@@ -119,9 +119,9 @@ export const FloatingTimer: React.FC = () => {
   const durationStr = formatTimeDuration(displaySeconds);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed bottom-3 right-3 md:bottom-4 md:right-4 z-50">
       {!minimized ? (
-        <div className="flex items-center gap-3 px-4 py-3 shadow-lg rounded-lg border bg-white min-w-[280px]">
+        <div className="flex items-center gap-3 px-4 py-3 shadow-xl rounded-2xl border border-white bg-white/88 backdrop-blur-xl min-w-[260px] md:min-w-[280px]">
           <div className="flex-1">
             <div className="text-sm font-semibold truncate">{current.t.desc || t('timer.noTask')}</div>
             <div className="text-xs text-gray-500 truncate">{current.c.name}</div>
@@ -129,19 +129,18 @@ export const FloatingTimer: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             {!current.t.isRunning ? (
-              <button onClick={start} className="px-3 py-1 text-sm rounded border bg-green-50 text-green-700 hover:bg-green-100">{t('timer.start')}</button>
+              <button onClick={start} className="px-3 py-1 text-sm rounded border accent-soft-bg accent-text-2 accent-border-soft">{t('timer.start')}</button>
             ) : (
-              <button onClick={pause} className="px-3 py-1 text-sm rounded border bg-yellow-50 text-yellow-700 hover:bg-yellow-100">{t('timer.pause')}</button>
+              <button onClick={pause} className="px-3 py-1 text-sm rounded border accent-bg text-white accent-border">{t('timer.pause')}</button>
             )}
             <button onClick={toggleMin} className="px-2 py-1 text-xs rounded border hover:bg-gray-50">{t('timer.minimize')}</button>
           </div>
         </div>
       ) : (
-        <button onClick={toggleMin} className="px-3 py-2 shadow-lg rounded-full border bg-white font-mono text-sm hover:bg-gray-50" aria-label="Restore Timer">
+        <button onClick={toggleMin} className="px-3 py-2 shadow-xl rounded-full border border-white bg-white/90 backdrop-blur-xl font-mono text-sm hover:bg-gray-50" aria-label="Restore Timer">
           {durationStr}
         </button>
       )}
     </div>
   );
 };
-

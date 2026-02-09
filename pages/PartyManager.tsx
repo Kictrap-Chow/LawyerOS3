@@ -47,29 +47,29 @@ export const PartyManager: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-8 h-full flex flex-col">
-      <div className="flex justify-between items-center mb-6">
+    <div className="max-w-6xl mx-auto p-3 md:p-6 h-full flex flex-col animate-fade-in">
+      <div className="craft-surface p-4 md:p-6 mb-4 md:mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#37352f]">Parties Database</h1>
-          <p className="text-gray-500 text-sm">Manage clients, opponents, and organizations.</p>
+          <h1 className="text-2xl font-bold text-strong-theme">Parties Database</h1>
+          <p className="text-slate-500 text-sm">Manage clients, opponents, and organizations.</p>
         </div>
-        <button onClick={openNew} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2 shadow-sm text-sm font-medium">
+        <button onClick={openNew} className="accent-bg accent-bg-hover text-white px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm text-sm font-medium w-fit">
           <Plus size={16} /> New Party
         </button>
       </div>
 
       <div className="relative mb-4">
-        <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+        <Search className="absolute left-3 top-3 text-slate-400" size={18} />
         <input 
-          className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded shadow-sm focus:outline-none focus:border-blue-300 transition-colors"
+          className="w-full pl-10 pr-4 py-2.5 craft-input shadow-sm focus:outline-none focus:border-[#8a6d95] transition-colors"
           placeholder="Search by name, ID code..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
       </div>
 
-      <div className="bg-white rounded-lg border border-[#e9e9e7] shadow-sm flex-1 overflow-hidden flex flex-col">
-        <div className="grid grid-cols-12 bg-gray-50 border-b border-[#e9e9e7] px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+      <div className="craft-surface flex-1 overflow-hidden flex flex-col">
+        <div className="hidden md:grid grid-cols-12 bg-[#f8fbff] border-b border-[#e1e8f2] px-4 py-2 text-xs font-semibold text-slate-500 uppercase">
           <div className="col-span-1 text-center">Type</div>
           <div className="col-span-4">Name</div>
           <div className="col-span-3">ID Code</div>
@@ -78,14 +78,20 @@ export const PartyManager: React.FC = () => {
         </div>
         <div className="overflow-y-auto flex-1">
            {filteredParties.map(p => (
-             <div key={p.id} className="grid grid-cols-12 px-4 py-3 border-b border-gray-100 hover:bg-[#fbfbfa] items-center text-sm group">
-               <div className="col-span-1 text-center text-lg">{p.type === 'company' ? '🏢' : '👤'}</div>
-               <div className="col-span-4 font-medium text-gray-800">{p.name}</div>
-               <div className="col-span-3 font-mono text-gray-500 text-xs">{p.idCode || '-'}</div>
-               <div className="col-span-3 text-gray-500 text-xs truncate">{p.address || '-'}</div>
-               <div className="col-span-1 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                 <button onClick={() => openEdit(p)} className="text-gray-400 hover:text-blue-600"><Edit2 size={14}/></button>
-                 <button onClick={() => { if(confirm('Delete?')) deleteParty(p.id) }} className="text-gray-400 hover:text-red-600"><Trash2 size={14}/></button>
+             <div key={p.id} className="grid grid-cols-1 md:grid-cols-12 px-4 py-3 border-b border-[#edf2f7] hover:bg-white items-center text-sm group gap-2 md:gap-0">
+               <div className="md:col-span-1 text-left md:text-center text-lg">{p.type === 'company' ? '🏢' : '👤'}</div>
+               <div className="md:col-span-4 font-medium text-slate-800">{p.name}</div>
+               <div className="md:hidden text-[11px] text-slate-500">
+                 <span className="font-semibold text-slate-400 mr-1">ID:</span>{p.idCode || '-'}
+               </div>
+               <div className="md:hidden text-[11px] text-slate-500 truncate">
+                 <span className="font-semibold text-slate-400 mr-1">Addr:</span>{p.address || '-'}
+               </div>
+               <div className="hidden md:block md:col-span-3 font-mono text-slate-500 text-xs">{p.idCode || '-'}</div>
+               <div className="hidden md:block md:col-span-3 text-slate-500 text-xs truncate">{p.address || '-'}</div>
+               <div className="md:col-span-1 flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                 <button onClick={() => openEdit(p)} className="text-gray-400 hover:text-[#6b5a8b]"><Edit2 size={14}/></button>
+                 <button onClick={() => { if(confirm('Delete?')) deleteParty(p.id) }} className="text-gray-400 hover:text-[#7a4f69]"><Trash2 size={14}/></button>
                </div>
              </div>
            ))}
@@ -94,35 +100,35 @@ export const PartyManager: React.FC = () => {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg shadow-xl w-[500px] animate-fade-in p-6 relative">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-50 flex items-center justify-center p-3">
+          <div className="bg-white/90 craft-surface w-[500px] max-w-[95vw] animate-fade-in p-6 relative">
             <button onClick={() => setModalOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={20}/></button>
             <h2 className="text-xl font-bold mb-4">{editingParty ? 'Edit Party' : 'Create Party'}</h2>
             <form onSubmit={handleSave} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Name</label>
-                <input required name="name" defaultValue={editingParty?.name} className="w-full border rounded p-2 text-sm outline-none focus:ring-2 ring-blue-100" />
+                <input required name="name" defaultValue={editingParty?.name} className="w-full craft-input p-2 text-sm outline-none focus:ring-2 ring-[#e7d9ee]" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Type</label>
-                   <select name="type" defaultValue={editingParty?.type || 'company'} className="w-full border rounded p-2 text-sm outline-none bg-white">
+                   <select name="type" defaultValue={editingParty?.type || 'company'} className="w-full craft-input p-2 text-sm outline-none bg-white">
                      <option value="company">Company</option>
                      <option value="individual">Individual</option>
                    </select>
                 </div>
                 <div>
                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">ID Code</label>
-                   <input name="idCode" defaultValue={editingParty?.idCode} className="w-full border rounded p-2 text-sm outline-none focus:ring-2 ring-blue-100" />
+                   <input name="idCode" defaultValue={editingParty?.idCode} className="w-full craft-input p-2 text-sm outline-none focus:ring-2 ring-[#e7d9ee]" />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Address</label>
-                <input name="address" defaultValue={editingParty?.address} className="w-full border rounded p-2 text-sm outline-none focus:ring-2 ring-blue-100" />
+                <input name="address" defaultValue={editingParty?.address} className="w-full craft-input p-2 text-sm outline-none focus:ring-2 ring-[#e7d9ee]" />
               </div>
               <div className="flex justify-end gap-2 pt-4">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 rounded hover:bg-gray-100 text-sm">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow-sm">Save</button>
+                <button type="submit" className="px-4 py-2 accent-bg accent-bg-hover text-white rounded-xl text-sm shadow-sm">Save</button>
               </div>
             </form>
           </div>

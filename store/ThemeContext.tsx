@@ -1,0 +1,109 @@
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+
+type ThemeFont = 'chatgpt' | 'system' | 'serif';
+
+interface ThemeContextType {
+  accent: string;
+  setAccent: (hex: string) => void;
+  textColor: string;
+  setTextColor: (hex: string) => void;
+  font: ThemeFont;
+  setFont: (font: ThemeFont) => void;
+}
+
+const ACCENT_KEY = 'lawyerThemeAccent';
+const TEXT_KEY = 'lawyerThemeTextColor';
+const FONT_KEY = 'lawyerThemeFont';
+
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+const hexToRgb = (hex: string): [number, number, number] | null => {
+  const cleaned = hex.trim().replace('#', '');
+  if (!/^[\da-fA-F]{6}$/.test(cleaned)) return null;
+  const r = parseInt(cleaned.slice(0, 2), 16);
+  const g = parseInt(cleaned.slice(2, 4), 16);
+  const b = parseInt(cleaned.slice(4, 6), 16);
+  return [r, g, b];
+};
+
+const darkenHex = (hex: string, factor = 0.18) => {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return '#0f8f70';
+  const [r, g, b] = rgb;
+  const d = (x: number) => Math.round(x * (1 - factor));
+  return `#${d(r).toString(16).padStart(2, '0')}${d(g).toString(16).padStart(2, '0')}${d(b).toString(16).padStart(2, '0')}`;
+};
+
+const withAlpha = (hex: string, alpha: number) => {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return 'rgba(16, 163, 127, 0.14)';
+  const [r, g, b] = rgb;
+  const a = clamp(alpha, 0, 1);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+};
+
+const fontFamilyByType: Record<ThemeFont, string> = {
+  chatgpt:
+    '"Sohne", "Söhne", "Segoe UI", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif',
+  system:
+    '"SF Pro Text", "SF Pro Display", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif',
+  serif:
+    '"Source Han Serif SC", "Noto Serif SC", "Songti SC", "Times New Roman", serif',
+};
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [accent, setAccentState] = useState('#10a37f');
+  const [textColor, setTextColorState] = useState('#1f2937');
+  const [font, setFontState] = useState<ThemeFont>('chatgpt');
+
+  useEffect(() => {
+    const savedAccent = localStorage.getItem(ACCENT_KEY);
+    const savedText = localStorage.getItem(TEXT_KEY);
+    const savedFont = localStorage.getItem(FONT_KEY) as ThemeFont | null;
+    if (savedAccent && /^#[\da-fA-F]{6}$/.test(savedAccent)) setAccentState(savedAccent);
+    if (savedText && /^#[\da-fA-F]{6}$/.test(savedText)) setTextColorState(savedText);
+    if (savedFont === 'chatgpt' || savedFont === 'system' || savedFont === 'serif') setFontState(savedFont);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(ACCENT_KEY, accent);
+    const root = document.documentElement;
+    const accent2 = darkenHex(accent, 0.15);
+    root.style.setProperty('--ui-accent', accent);
+    root.style.setProperty('--ui-accent-2', accent2);
+    root.style.setProperty('--ui-accent-soft', withAlpha(accent, 0.12));
+    root.style.setProperty('--ui-accent-soft-2', withAlpha(accent, 0.2));
+  }, [accent]);
+
+  useEffect(() => {
+    localStorage.setItem(TEXT_KEY, textColor);
+    document.documentElement.style.setProperty('--ui-text-strong', textColor);
+  }, [textColor]);
+
+  useEffect(() => {
+    localStorage.setItem(FONT_KEY, font);
+    document.documentElement.style.setProperty('--app-font-family', fontFamilyByType[font]);
+  }, [font]);
+
+  const value = useMemo(
+    () => ({
+      accent,
+      setAccent: setAccentState,
+      textColor,
+      setTextColor: setTextColorState,
+      font,
+      setFont: setFontState,
+    }),
+    [accent, textColor, font]
+  );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+};
+
+export const useTheme = () => {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) throw new Error('useTheme must be used within ThemeProvider');
+  return ctx;
+};

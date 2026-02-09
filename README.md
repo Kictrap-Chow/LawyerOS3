@@ -1,20 +1,47 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# LawyerOS3
 
-# Run and deploy your AI Studio app
+案件管理系统（React + Vite），已支持 Supabase 实时同步。
 
-This contains everything you need to run your app locally.
+## 1. 安装依赖
 
-View your app in AI Studio: https://ai.studio/apps/drive/1LTTbJ7rLcYbO1vOZrW6n7AyT1QxcpHl_
+```bash
+npm install
+```
 
-## Run Locally
+## 2. 配置 Supabase
 
-**Prerequisites:**  Node.js
+1. 在 Supabase 创建项目。
+2. 进入 SQL Editor，执行 `supabase/schema.sql`。
+3. 在项目根目录复制环境变量文件并填入你的项目信息：
 
+```bash
+cp .env.example .env.local
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+`.env.local` 示例：
+
+```bash
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+```
+
+4. 在 Supabase 控制台开启 Realtime：
+- `Database` -> `Replication` -> 将 `cases` 和 `parties` 表加入 realtime publication。
+
+## 3. 启动项目
+
+```bash
+npm run dev
+```
+
+## 4. 同步行为说明
+
+- 配置了 Supabase：
+  - 手机端和电脑端改动会实时同步。
+  - 侧边栏底部显示同步状态和最后同步时间。
+- 未配置 Supabase：
+  - 自动退回本地模式（localStorage / 原有 `/api/data`）。
+
+## 5. 数据备份
+
+仍可通过界面中的 `Backup Data` 导出 JSON 备份。
