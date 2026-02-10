@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useI18n } from '../store/I18nContext';
 import { useTheme } from '../store/ThemeContext';
 import { cn } from '../utils';
 import { useData } from '../store/DataContext';
+import { FileJson, FileUp } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const { lang, setLang } = useI18n();
   const { accent, setAccent, textColor, setTextColor, font, setFont } = useTheme();
-  const { isSupabaseEnabled, authLoading, isAuthenticated, userEmail, signIn, signUp, signOut } = useData();
+  const { isSupabaseEnabled, authLoading, isAuthenticated, userEmail, signIn, signUp, signOut, exportData, importData } = useData();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toFriendlyAuthMessage = (raw?: string) => {
     const msg = (raw || '').toLowerCase();
@@ -42,6 +44,20 @@ export const Settings: React.FC = () => {
     await signOut();
     setAuthBusy(false);
     setAuthMessage('已退出登录。');
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      importData(text);
+      alert('数据导入成功');
+    } catch {
+      alert('读取文件失败，请重试');
+    } finally {
+      e.target.value = '';
+    }
   };
 
   return (
@@ -155,6 +171,33 @@ export const Settings: React.FC = () => {
               <option value="serif">Serif</option>
             </select>
           </label>
+        </div>
+      </div>
+
+      <div className="craft-panel p-4 md:p-5 mb-4">
+        <h2 className="text-sm font-semibold text-[#6f6377] uppercase mb-3">数据管理</h2>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            onClick={exportData}
+            className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border border-[#ddd2e3] hover:bg-white text-[#5f5568]"
+          >
+            <FileJson size={14} />
+            备份数据
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border border-[#ddd2e3] hover:bg-white text-[#5f5568]"
+          >
+            <FileUp size={14} />
+            导入数据
+          </button>
         </div>
       </div>
     </div>

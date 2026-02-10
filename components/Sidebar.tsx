@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../store/DataContext';
 import { 
-  Home, Users, Archive, Plus, Search, FileJson,
+  Home, Users, Archive, Plus, Search,
   Scale, Cloud, CloudOff, AlertTriangle, Settings, PanelLeftClose
 } from 'lucide-react';
 import { cn } from '../utils';
@@ -16,7 +16,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, className, onAfterNavigate, onToggleCollapse }) => {
-  const { cases, activeView, activeCaseId, navigate, appTitle, setAppTitle, exportData, syncStatus, syncError, lastSyncedAt, isSupabaseEnabled } = useData();
+  const { cases, activeView, activeCaseId, navigate, appTitle, setAppTitle, syncStatus, syncError, lastSyncedAt, isSupabaseEnabled } = useData();
   const { t } = useI18n();
   const [editingTitle, setEditingTitle] = useState(false);
   const activeCases = cases
@@ -194,13 +194,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
             {t('sync.lastSynced')}: {syncedTimeLabel}
           </div>
           {syncError && <div className="px-2 text-[10px] text-[#7a4f69] truncate">{friendlySyncError}</div>}
-          <button 
-            onClick={exportData}
-            className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-[#efefed] text-[#787774] w-full text-left"
-          >
-            <FileJson size={14} />
-            {t('footer.backup')}
-          </button>
         </div>
       </div>
     </div>
