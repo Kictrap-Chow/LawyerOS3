@@ -10,14 +10,19 @@ import { Settings } from './pages/Settings';
 import { CaseForm } from './components/CaseForm';
 import { GlobalSearch } from './components/GlobalSearch';
 import { FloatingTimer } from './components/FloatingTimer';
-import { Archive, Briefcase, Home, Menu, PanelLeft, Plus, Search, Settings as SettingsIcon, Users } from 'lucide-react';
+import { Archive, Briefcase, ClipboardPlus, Home, PanelLeft, Plus, Search, Settings as SettingsIcon, Users } from 'lucide-react';
+import { nowISO, uuid } from './utils';
 
 const MainLayout: React.FC = () => {
   const { activeView, activeCaseId, navigate, addCase, cases, updateCase } = useData();
   const [showCaseForm, setShowCaseForm] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [showMobileNav, setShowMobileNav] = useState(false);
   const [showDesktopNav, setShowDesktopNav] = useState(true);
+  const [showMobileCases, setShowMobileCases] = useState(false);
+  const [showQuickTask, setShowQuickTask] = useState(false);
+  const [quickCaseId, setQuickCaseId] = useState('');
+  const [quickTaskDesc, setQuickTaskDesc] = useState('');
+  const [quickTaskType, setQuickTaskType] = useState<'文书' | '会议' | '咨询' | '其他'>('文书');
 
   const getHeaderTitle = () => {
     if (activeView === 'dashboard') return 'Dashboard';
@@ -29,9 +34,55 @@ const MainLayout: React.FC = () => {
     }
     return 'LawyerOS';
   };
+  const mobileCases = cases
+    .filter((c) => c.status !== 'archived')
+    .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+
+  const openQuickTask = () => {
+    if (mobileCases.length === 0) {
+      alert('请先新建案件');
+      return;
+    }
+    setQuickCaseId((prev) => prev || mobileCases[0].id);
+    setQuickTaskDesc('');
+    setQuickTaskType('文书');
+    setShowQuickTask(true);
+  };
+
+  const createQuickTask = () => {
+    const target = cases.find((c) => c.id === quickCaseId);
+    if (!target) {
+      alert('请选择案件');
+      return;
+    }
+    if (!quickTaskDesc.trim()) {
+      alert('请填写任务内容');
+      return;
+    }
+    updateCase({
+      ...target,
+      tasks: [
+        {
+          id: uuid(),
+          type: quickTaskType,
+          desc: quickTaskDesc.trim(),
+          assignee: '',
+          notes: '',
+          createdAt: nowISO(),
+          completedAt: null,
+          sessions: [],
+          isRunning: false,
+          isCompleted: false
+        },
+        ...(target.tasks || [])
+      ]
+    });
+    setShowQuickTask(false);
+    navigate('case', target.id, 'tasks');
+  };
 
   return (
-    <div className="flex h-dvh w-full text-[#1f2937] font-sans antialiased overflow-hidden selection:bg-blue-100 selection:text-blue-900 p-1.5 md:p-3 gap-1.5 md:gap-3">
+    <div className="flex h-dvh w-full max-w-full text-[#1f2937] font-sans antialiased overflow-hidden overflow-x-hidden selection:bg-blue-100 selection:text-blue-900 p-1.5 md:p-3 gap-1.5 md:gap-3">
       {showDesktopNav && (
         <Sidebar
           className="hidden md:flex"
@@ -41,25 +92,7 @@ const MainLayout: React.FC = () => {
         />
       )}
 
-      {showMobileNav && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" onClick={() => setShowMobileNav(false)} />
-          <Sidebar
-            className="relative z-10 w-[92vw] max-w-[360px] h-full shadow-2xl"
-            onSearch={() => {
-              setShowSearch(true);
-              setShowMobileNav(false);
-            }}
-            onCreateCase={() => {
-              setShowCaseForm(true);
-              setShowMobileNav(false);
-            }}
-            onAfterNavigate={() => setShowMobileNav(false)}
-          />
-        </div>
-      )}
-
-      <main className="flex-1 h-full overflow-y-auto relative craft-surface p-1.5 pb-24 md:pb-3 md:p-3">
+      <main className="flex-1 h-full max-w-full overflow-y-auto overflow-x-hidden relative craft-surface p-1.5 pb-24 md:pb-3 md:p-3">
         {!showDesktopNav && (
           <div className="hidden md:block fixed left-3 top-3 z-40">
             <button
@@ -73,12 +106,12 @@ const MainLayout: React.FC = () => {
         )}
         <div className="md:hidden sticky top-0 z-30 mb-2 px-2 py-2 craft-panel backdrop-blur supports-[backdrop-filter]:bg-white/75">
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowMobileNav(true)} className="p-2 rounded-xl hover:bg-gray-100">
-              <Menu size={18} />
-            </button>
             <div className="flex-1 truncate text-sm font-semibold">{getHeaderTitle()}</div>
             <button onClick={() => setShowSearch(true)} className="p-2 rounded-xl hover:bg-gray-100">
               <Search size={18} />
+            </button>
+            <button onClick={openQuickTask} className="p-2 rounded-xl hover:bg-gray-100">
+              <ClipboardPlus size={18} />
             </button>
             <button onClick={() => setShowCaseForm(true)} className="p-2 rounded-xl hover:bg-gray-100">
               <Plus size={18} />
@@ -158,21 +191,89 @@ const MainLayout: React.FC = () => {
             <span>设置</span>
           </button>
           <button
+            onClick={() => setShowMobileCases(true)}
+            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'case' || showMobileCases ? 'accent-text bg-[var(--ui-accent-soft)]' : 'text-gray-500'}`}
+          >
+            <Briefcase size={16} />
+            <span>案件</span>
+          </button>
+          <button
             onClick={() => navigate('archives')}
             className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'archives' ? 'accent-text bg-[var(--ui-accent-soft)]' : 'text-gray-500'}`}
           >
             <Archive size={16} />
             <span>归档</span>
           </button>
-          <button
-            onClick={() => (activeCaseId ? navigate('case', activeCaseId) : navigate('dashboard'))}
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'case' ? 'accent-text bg-[var(--ui-accent-soft)]' : activeCaseId ? 'text-gray-500' : 'text-gray-300'}`}
-          >
-            <Briefcase size={16} />
-            <span>案件</span>
-          </button>
         </div>
       </div>
+
+      {showMobileCases && (
+        <div className="md:hidden fixed inset-0 z-50 flex items-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowMobileCases(false)} />
+          <div className="relative w-full rounded-t-2xl bg-white border-t border-[#e2e8f0] max-h-[75vh] overflow-y-auto p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-semibold">案件</div>
+              <button onClick={() => setShowCaseForm(true)} className="text-xs px-2 py-1 rounded border tint-border">新建</button>
+            </div>
+            <div className="space-y-1">
+              {mobileCases.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    navigate('case', c.id);
+                    setShowMobileCases(false);
+                  }}
+                  className="w-full text-left p-2.5 rounded-xl border border-[#e6edf6] bg-white/90"
+                >
+                  <div className="text-sm font-medium text-[#243247] truncate">{c.name}</div>
+                  <div className="text-[11px] text-[#7b8798] mt-0.5">{c.type}</div>
+                </button>
+              ))}
+              {mobileCases.length === 0 && <div className="text-xs text-gray-400 p-2">暂无进行中案件</div>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showQuickTask && (
+        <div className="md:hidden fixed inset-0 z-50 flex items-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowQuickTask(false)} />
+          <div className="relative w-full rounded-t-2xl bg-white border-t border-[#e2e8f0] p-3">
+            <div className="text-sm font-semibold mb-2">快速创建任务</div>
+            <div className="space-y-2">
+              <select
+                className="w-full text-sm border tint-border rounded px-3 py-2 bg-white outline-none"
+                value={quickCaseId}
+                onChange={(e) => setQuickCaseId(e.target.value)}
+              >
+                {mobileCases.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <select
+                className="w-full text-sm border tint-border rounded px-3 py-2 bg-white outline-none"
+                value={quickTaskType}
+                onChange={(e) => setQuickTaskType(e.target.value as any)}
+              >
+                <option value="文书">文书</option>
+                <option value="会议">会议</option>
+                <option value="咨询">咨询</option>
+                <option value="其他">其他</option>
+              </select>
+              <input
+                className="w-full text-sm border tint-border rounded px-3 py-2 outline-none"
+                placeholder="任务内容"
+                value={quickTaskDesc}
+                onChange={(e) => setQuickTaskDesc(e.target.value)}
+              />
+              <div className="flex justify-end gap-2 pt-1">
+                <button onClick={() => setShowQuickTask(false)} className="px-3 py-1.5 text-sm rounded border tint-border">取消</button>
+                <button onClick={createQuickTask} className="px-3 py-1.5 text-sm rounded accent-bg text-white">创建</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

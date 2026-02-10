@@ -8,6 +8,7 @@ type CaseTaskRef = { caseId: string; taskId: string };
 
 const LAST_KEY = 'lawyer_last_timer_ref';
 const MIN_KEY = 'lawyer_timer_minimized';
+const POS_KEY = 'lawyer_timer_pos';
 
 const findRunningTask = (cases: Case[]): { c: Case; t: Task } | null => {
   let best: { c: Case; t: Task; startTs: number } | null = null;
@@ -44,6 +45,14 @@ export const FloatingTimer: React.FC = () => {
     const raw = localStorage.getItem(LAST_KEY);
     try { return raw ? JSON.parse(raw) as CaseTaskRef : null; } catch { return null; }
   });
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(() => {
+    const raw = localStorage.getItem(POS_KEY);
+    try {
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) return parsed;
+    } catch {}
+    return null;
+  });
 
   const current = useMemo(() => {
     const running = findRunningTask(cases);
@@ -64,6 +73,27 @@ export const FloatingTimer: React.FC = () => {
   useEffect(() => {
     setDisplaySeconds(current ? calculateTaskDuration(current.t) : 0);
   }, [current]);
+
+  useEffect(() => {
+    if (!pos) return;
+    localStorage.setItem(POS_KEY, JSON.stringify(pos));
+  }, [pos]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const resetDefault = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const cardW = minimized ? 120 : Math.min(340, w * 0.92);
+      const cardH = minimized ? 44 : 112;
+      const x = Math.max(8, w - cardW - 12);
+      const y = Math.max(8, h - cardH - (w < 768 ? 90 : 16));
+      setPos((prev) => prev ?? { x, y });
+    };
+    resetDefault();
+    window.addEventListener('resize', resetDefault);
+    return () => window.removeEventListener('resize', resetDefault);
+  }, [minimized, pos]);
 
   useEffect(() => {
     if (!current || !current.t.isRunning) return;
@@ -118,10 +148,46 @@ export const FloatingTimer: React.FC = () => {
 
   const durationStr = formatTimeDuration(displaySeconds);
 
+  const onDragStart = (e: React.PointerEvent<HTMLDivElement | HTMLButtonElement>) => {
+    if (typeof window === 'undefined') return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const base = pos || { x: 12, y: 12 };
+    const cardW = minimized ? 120 : Math.min(340, window.innerWidth * 0.92);
+    const cardH = minimized ? 44 : 112;
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+
+    const onMove = (ev: PointerEvent) => {
+      const nextX = base.x + (ev.clientX - startX);
+      const nextY = base.y + (ev.clientY - startY);
+      const maxX = Math.max(8, window.innerWidth - cardW - 8);
+      const maxY = Math.max(8, window.innerHeight - cardH - 8);
+      setPos({
+        x: Math.min(Math.max(8, nextX), maxX),
+        y: Math.min(Math.max(8, nextY), maxY),
+      });
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
   return (
-    <div className="fixed bottom-3 right-3 md:bottom-4 md:right-4 z-50">
+    <div
+      className="fixed z-50"
+      style={{ left: pos?.x ?? 12, top: pos?.y ?? 12 }}
+    >
       {!minimized ? (
-        <div className="flex items-center gap-3 px-4 py-3 shadow-xl rounded-2xl border border-white bg-white/88 backdrop-blur-xl min-w-[260px] md:min-w-[280px]">
+        <div
+          className="flex items-center gap-3 px-3 md:px-4 py-2.5 md:py-3 shadow-xl rounded-2xl border border-white bg-white/88 backdrop-blur-xl w-[min(92vw,340px)] md:min-w-[280px] touch-none"
+          onPointerDown={onDragStart}
+        >
           <div className="flex-1">
             <div className="text-sm font-semibold truncate">{current.t.desc || t('timer.noTask')}</div>
             <div className="text-xs text-gray-500 truncate">{current.c.name}</div>
@@ -137,7 +203,12 @@ export const FloatingTimer: React.FC = () => {
           </div>
         </div>
       ) : (
-        <button onClick={toggleMin} className="px-3 py-2 shadow-xl rounded-full border border-white bg-white/90 backdrop-blur-xl font-mono text-sm hover:bg-gray-50" aria-label="Restore Timer">
+        <button
+          onPointerDown={onDragStart}
+          onClick={toggleMin}
+          className="px-3 py-2 shadow-xl rounded-full border border-white bg-white/90 backdrop-blur-xl font-mono text-sm hover:bg-gray-50 touch-none"
+          aria-label="Restore Timer"
+        >
           {durationStr}
         </button>
       )}

@@ -75,6 +75,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.style.setProperty('--ui-accent-2', accent2);
     root.style.setProperty('--ui-accent-soft', withAlpha(accent, 0.12));
     root.style.setProperty('--ui-accent-soft-2', withAlpha(accent, 0.2));
+    root.style.setProperty('--ui-tint-bg', withAlpha(accent, 0.08));
+    root.style.setProperty('--ui-tint-bg-strong', withAlpha(accent, 0.14));
+    root.style.setProperty('--ui-tint-border', withAlpha(accent, 0.28));
+    root.style.setProperty('--ui-tint-text', darkenHex(accent, 0.32));
+    root.style.setProperty('--ui-muted', darkenHex(accent, 0.45));
+    root.style.setProperty('--ui-text-soft', darkenHex(accent, 0.36));
   }, [accent]);
 
   useEffect(() => {

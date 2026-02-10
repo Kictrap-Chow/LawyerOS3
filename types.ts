@@ -1,4 +1,4 @@
-export type CaseType = '诉讼' | '仲裁' | '专项法律服务' | '常年法律顾问' | '争议解决';
+export type CaseType = '诉讼' | '仲裁' | '专项法律服务' | '常年法律顾问';
 export type CaseStatus = 'active' | 'dormant' | 'archived';
 export type PartyType = 'company' | 'individual';
 

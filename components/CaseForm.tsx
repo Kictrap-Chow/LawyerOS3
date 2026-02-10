@@ -64,7 +64,6 @@ export const CaseForm: React.FC<CaseFormProps> = ({ onClose, onSave }) => {
               <option value="仲裁">{t('case.type.arbitration')}</option>
               <option value="专项法律服务">{t('case.type.special')}</option>
               <option value="常年法律顾问">{t('case.type.retainer')}</option>
-              <option value="争议解决">{t('case.type.dispute')}</option>
             </select>
           </div>
           <div className="pt-4 flex justify-end gap-2">

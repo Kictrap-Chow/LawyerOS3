@@ -68,10 +68,10 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="craft-panel p-4 md:p-5 mb-4">
-        <h2 className="text-sm font-semibold text-[#6f6377] uppercase mb-3">系统</h2>
-        <label className="block text-xs text-[#8a8092] mb-1">系统名称</label>
+        <h2 className="text-sm font-semibold tint-text uppercase mb-3">系统</h2>
+        <label className="block text-xs tint-text mb-1">系统名称</label>
         <input
-          className="w-full text-sm bg-white border border-[#ddd2e3] rounded px-3 py-2 outline-none"
+          className="w-full text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
           value={appTitle}
           onChange={(e) => setAppTitle(e.target.value)}
           placeholder="请输入系统名称"
@@ -79,7 +79,7 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="craft-panel p-4 md:p-5 mb-4">
-        <h2 className="text-sm font-semibold text-[#6f6377] uppercase mb-3">账号与同步</h2>
+        <h2 className="text-sm font-semibold tint-text uppercase mb-3">账号与同步</h2>
         {!isSupabaseEnabled && (
           <div className="text-sm text-gray-500">当前未配置云端同步环境变量，在线同步不可用。</div>
         )}
@@ -102,7 +102,7 @@ export const Settings: React.FC = () => {
                 placeholder="邮箱"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full text-sm bg-white border border-[#ddd2e3] rounded px-3 py-2 outline-none"
+                className="w-full text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
               />
               <input
                 type="password"
@@ -111,11 +111,11 @@ export const Settings: React.FC = () => {
                 placeholder="密码"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full text-sm bg-white border border-[#ddd2e3] rounded px-3 py-2 outline-none"
+                className="w-full text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
               />
               <div className="flex gap-2">
                 <button type="submit" disabled={authBusy} className="accent-bg accent-bg-hover text-white px-3 py-1.5 rounded text-sm disabled:opacity-60">登录</button>
-                <button type="button" disabled={authBusy} onClick={handleSignUp} className="px-3 py-1.5 rounded text-sm border border-[#ddd2e3] hover:bg-white disabled:opacity-60">注册</button>
+                <button type="button" disabled={authBusy} onClick={handleSignUp} className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60">注册</button>
               </div>
             </form>
             {authMessage && <div className="text-xs text-gray-500">{authMessage}</div>}
@@ -124,14 +124,14 @@ export const Settings: React.FC = () => {
         {isSupabaseEnabled && !authLoading && isAuthenticated && (
           <div className="space-y-2">
             <div className="text-sm text-gray-600">当前登录：<span className="font-medium text-strong-theme">{userEmail}</span></div>
-            <button disabled={authBusy} onClick={handleSignOut} className="px-3 py-1.5 rounded text-sm border border-[#ddd2e3] hover:bg-white disabled:opacity-60">退出登录</button>
+            <button disabled={authBusy} onClick={handleSignOut} className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60">退出登录</button>
             {authMessage && <div className="text-xs text-gray-500">{authMessage}</div>}
           </div>
         )}
       </div>
 
       <div className="craft-panel p-4 md:p-5 mb-4">
-        <h2 className="text-sm font-semibold text-[#6f6377] uppercase mb-3">语言</h2>
+        <h2 className="text-sm font-semibold tint-text uppercase mb-3">语言</h2>
         <div className="flex items-center gap-2">
           <button
             className={cn(
@@ -155,7 +155,7 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="craft-panel p-4 md:p-5 mb-4">
-        <h2 className="text-sm font-semibold text-[#6f6377] uppercase mb-3">外观</h2>
+        <h2 className="text-sm font-semibold tint-text uppercase mb-3">外观</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <label className="flex items-center gap-2 text-sm bg-white/80 border border-[#e9e9e7] rounded-xl px-3 py-2">
             <span className="text-[#787774] min-w-[72px]">强调色</span>
@@ -186,11 +186,11 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="craft-panel p-4 md:p-5 mb-4">
-        <h2 className="text-sm font-semibold text-[#6f6377] uppercase mb-3">数据管理</h2>
+        <h2 className="text-sm font-semibold tint-text uppercase mb-3">数据管理</h2>
         <div className="flex flex-col sm:flex-row gap-2">
           <button
             onClick={exportData}
-            className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border border-[#ddd2e3] hover:bg-white text-[#5f5568]"
+            className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text"
           >
             <FileJson size={14} />
             备份数据
@@ -204,7 +204,7 @@ export const Settings: React.FC = () => {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border border-[#ddd2e3] hover:bg-white text-[#5f5568]"
+            className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text"
           >
             <FileUp size={14} />
             导入数据

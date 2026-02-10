@@ -217,7 +217,7 @@ export const Dashboard: React.FC = () => {
               const next = e.target.value;
               if (next === 'compact' || next === 'comfort' || next === 'expanded') setWidgetSize(next);
             }}
-            className="text-xs border border-[#ddd2e3] rounded px-2 py-1 bg-white outline-none"
+            className="text-xs border tint-border rounded px-2 py-1 bg-white outline-none"
           >
             <option value="compact">{t('dashboard.sizeCompact')}</option>
             <option value="comfort">{t('dashboard.sizeComfort')}</option>
@@ -242,8 +242,8 @@ export const Dashboard: React.FC = () => {
       <div className="flex flex-col md:flex-row gap-4 md:gap-6 mb-6 md:mb-8">
         {/* Deadlines Widget */}
         <div
-          className="craft-surface p-4 md:resize-y overflow-auto min-h-[220px]"
-          style={{ height: `${sizeCfg.cardHeight}px`, width: `min(100%, clamp(280px, ${horizontalSplit}%, 62%))` }}
+          className="craft-surface p-4 w-full md:[width:var(--deadline-width)] md:resize-y overflow-auto min-h-[220px]"
+          style={{ height: `${sizeCfg.cardHeight}px`, ['--deadline-width' as any]: `clamp(280px, ${horizontalSplit}%, 62%)` }}
         >
           <div className="flex items-center gap-2 mb-4 accent-text-2 font-medium">
             <AlertCircle size={18} />
@@ -251,9 +251,9 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="space-y-2">
             {deadlines.length === 0 ? <p className="text-sm text-gray-400 italic">{t('dashboard.noUrgentDeadlines')}</p> : deadlines.map(d => (
-              <div key={d.id} onClick={() => navigate('case', d.caseId, 'deadlines')} className="p-2 rounded bg-[#f8eeef] border border-[#e7d2d8] cursor-pointer hover:bg-[#f2e4e9] transition-colors">
+              <div key={d.id} onClick={() => navigate('case', d.caseId, 'deadlines')} className="p-2 rounded tint-bg border tint-border cursor-pointer hover:tint-bg-strong transition-colors">
                 <div className="text-sm font-medium text-gray-800">{d.title}</div>
-                <div className="flex justify-between text-xs text-[#7a4f69] mt-1">
+                <div className="flex justify-between text-xs tint-text mt-1">
                   <span>{d.date}</span>
                   <span className="truncate max-w-[100px]">{d.caseName}</span>
                 </div>
@@ -263,10 +263,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Tasks Widget */}
-        <div
-          className="craft-surface p-4 md:resize-y overflow-auto min-h-[220px] md:flex-1"
-          style={{ height: `${sizeCfg.cardHeight}px` }}
-        >
+        <div className="craft-surface p-4 md:resize-y overflow-auto min-h-[220px] md:flex-1" style={{ height: `${sizeCfg.cardHeight}px` }}>
           <div className="flex items-center gap-2 mb-4 accent-text font-medium">
             <CheckSquare size={18} />
             <span>{t('dashboard.recentTasks')}</span>
@@ -276,10 +273,10 @@ export const Dashboard: React.FC = () => {
                <div key={t.id} onClick={() => navigate('case', t.caseId, 'tasks')} className="flex flex-col p-3 rounded-md border border-[#e9e9e7] hover:bg-gray-50 cursor-pointer group">
                   <div className="flex items-start justify-between">
                     <span className="text-sm font-medium text-gray-800 line-clamp-1">{t.desc}</span>
-                    <ArrowRight size={14} className="text-gray-300 group-hover:text-[#6b5a8b] opacity-0 group-hover:opacity-100 transition-all" />
+                    <ArrowRight size={14} className="text-gray-300 group-hover:tint-text opacity-0 group-hover:opacity-100 transition-all" />
                   </div>
                   <div className="mt-2 text-xs text-gray-500 flex justify-between">
-                    <span className="bg-[#f3edf5] px-1.5 py-0.5 rounded">{t.type}</span>
+                    <span className="tint-bg px-1.5 py-0.5 rounded">{t.type}</span>
                     <span className="truncate max-w-[120px]">{t.caseName}</span>
                   </div>
                </div>
@@ -296,12 +293,12 @@ export const Dashboard: React.FC = () => {
         <div className="space-y-2">
           {reminders.length === 0 ? <p className="text-sm text-gray-400 italic">{t('dashboard.noScheduledEvents')}</p> : reminders.map(r => (
             <div key={r.id} onClick={() => navigate('case', r.caseId, 'schedule')} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-50 last:border-0">
-               <div className="w-16 md:w-24 text-[11px] md:text-xs font-mono text-[#6b5a8b] text-center border-r border-gray-100 pr-2 mr-3">
+               <div className="w-16 md:w-24 text-[11px] md:text-xs font-mono tint-text text-center border-r border-gray-100 pr-2 mr-3">
                  <div className="font-bold">{r.date.slice(5)}</div>
                  <div>{r.time}</div>
                </div>
                <div className="flex-1">
-                 <div className="text-sm text-[#3f2f4d]">{r.title}</div>
+                 <div className="text-sm tint-text">{r.title}</div>
                  <div className="text-xs text-gray-400">{r.caseName}</div>
                </div>
             </div>
@@ -312,7 +309,7 @@ export const Dashboard: React.FC = () => {
       {/* Calendar Section */}
       <div className="craft-surface overflow-hidden">
          <div className="p-4 border-b border-[#e9e9e7] flex items-center justify-between bg-gray-50">
-           <div className="flex items-center gap-2 font-medium text-[#3f2f4d]">
+           <div className="flex items-center gap-2 font-medium tint-text">
              <CalendarIcon size={18} />
              {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
            </div>
@@ -350,7 +347,7 @@ export const Dashboard: React.FC = () => {
                      {allEvents.map((e, i) => (
                        <div key={i} onClick={() => { navigate('case', e.caseId, e.type === 'Deadline' ? 'deadlines' : 'schedule'); setSelectedDate(null); }} className="p-3 rounded border border-gray-100 hover:bg-gray-50 cursor-pointer">
                           <div className="flex justify-between items-start mb-1">
-                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${e.type === 'Deadline' ? 'bg-[#f2e4e9] text-[#7a4f69]' : 'bg-[#efe6f5] text-[#6b5a8b]'}`}>{e.type}</span>
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${e.type === 'Deadline' ? 'tint-bg-strong tint-text' : 'tint-bg tint-text'}`}>{e.type}</span>
                             {/* @ts-ignore */}
                             {e.time && <span className="text-xs text-gray-400">{e.time}</span>}
                           </div>

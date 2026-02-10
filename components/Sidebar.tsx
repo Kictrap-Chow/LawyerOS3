@@ -29,15 +29,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
     if (raw === '仲裁' || raw === 'Arbitration') return 'arbitration';
     if (raw === '常年法律顾问' || raw === 'Retainer') return 'retainer';
     if (raw === '专项法律服务' || raw === 'Advisory') return 'special';
-    if (raw === '争议解决' || raw === 'Dispute') return 'dispute';
-    return 'other';
+    return 'litigation';
   };
   const caseTypeSections: Array<{ key: string; title: string; items: Case[] }> = [
     { key: 'litigation', title: t('case.type.litigation'), items: activeCases.filter((c) => caseTypeToken(c) === 'litigation') },
     { key: 'arbitration', title: t('case.type.arbitration'), items: activeCases.filter((c) => caseTypeToken(c) === 'arbitration') },
     { key: 'retainer', title: t('case.type.retainer'), items: activeCases.filter((c) => caseTypeToken(c) === 'retainer') },
     { key: 'special', title: t('case.type.special'), items: activeCases.filter((c) => caseTypeToken(c) === 'special') },
-    { key: 'dispute', title: t('case.type.dispute'), items: activeCases.filter((c) => caseTypeToken(c) === 'dispute') },
   ];
 
   const NavItem = ({ icon: Icon, label, active, onClick, badge }: any) => (
@@ -66,12 +64,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
       return { icon: CloudOff, text: t('sync.offlineMode'), className: 'text-gray-500' };
     }
     if (syncStatus === 'online') {
-      return { icon: Cloud, text: t('sync.online'), className: 'text-[#6a5b75]' };
+      return { icon: Cloud, text: t('sync.online'), className: 'tint-text' };
     }
     if (syncStatus === 'syncing') {
-      return { icon: Cloud, text: t('sync.syncing'), className: 'text-[#6b5a8b]' };
+      return { icon: Cloud, text: t('sync.syncing'), className: 'tint-text' };
     }
-    return { icon: AlertTriangle, text: t('sync.error'), className: 'text-[#7a4f69]' };
+    return { icon: AlertTriangle, text: t('sync.error'), className: 'tint-text' };
   };
 
   const currentSync = syncBadge();
@@ -201,7 +199,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
           <div className="px-2 text-[10px] text-[#9b9a97]">
             {t('sync.lastSynced')}: {syncedTimeLabel}
           </div>
-          {syncError && <div className="px-2 text-[10px] text-[#7a4f69] truncate">{friendlySyncError}</div>}
+          {syncError && <div className="px-2 text-[10px] tint-text truncate">{friendlySyncError}</div>}
         </div>
       </div>
     </div>

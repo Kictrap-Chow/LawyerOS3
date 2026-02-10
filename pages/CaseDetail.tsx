@@ -10,9 +10,9 @@ import {
 
 const StatusBadge = ({ status }: { status: string }) => {
   const colors = {
-    active: 'bg-[#efe7f2] text-[#5b4f78] border-[#d8c8e1]',
-    dormant: 'bg-[#f6ecef] text-[#7a4f69] border-[#e6d3da]',
-    archived: 'bg-[#efeaf0] text-[#655a67] border-[#d8d0dc]'
+    active: 'tint-bg tint-text tint-border',
+    dormant: 'tint-bg tint-text tint-border',
+    archived: 'tint-bg tint-text tint-border'
   };
   return (
     <span className={`px-2.5 py-1 rounded-full text-xs border ${colors[status as keyof typeof colors] || colors.active} uppercase font-semibold tracking-wide`}>
@@ -46,7 +46,7 @@ const PartySelector = ({
       <div className="bg-white rounded-lg shadow-xl w-[400px] max-w-[95vw] max-h-[80vh] overflow-y-auto p-4 animate-fade-in" onClick={e => e.stopPropagation()}>
         <h3 className="font-bold text-lg mb-4">Select or Create Party</h3>
         <input 
-          className="w-full border border-gray-300 rounded p-2 mb-4 text-sm outline-none focus:border-[#8a6d95]"
+          className="w-full border border-gray-300 rounded p-2 mb-4 text-sm outline-none focus:border-[var(--ui-accent)]"
           placeholder="Search parties..."
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -56,7 +56,7 @@ const PartySelector = ({
           {filtered.map(p => (
             <div 
               key={p.id} 
-              className="p-2 hover:bg-[#f4edf8] cursor-pointer text-sm border-b border-gray-50 last:border-0"
+              className="p-2 hover:tint-bg cursor-pointer text-sm border-b border-gray-50 last:border-0"
               onClick={() => onSelect(p)}
             >
               <div className="font-medium">{p.name}</div>
@@ -203,10 +203,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
   };
 
   return (
-    <div className={`group flex flex-col sm:flex-row gap-3 p-3 mb-2 rounded border transition-all ${task.isRunning ? 'bg-[#f4edf8] border-[#dbcde6] shadow-sm' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+    <div className={`group flex flex-col sm:flex-row gap-3 p-3 mb-2 rounded border transition-all max-w-full min-w-0 ${task.isRunning ? 'tint-bg border tint-border shadow-sm' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
       <div className="flex-1 space-y-2">
         <div className="flex items-center gap-2">
-          {task.isCompleted && <CheckCircle size={16} className="text-[#6a5b75]" />}
+          {task.isCompleted && <CheckCircle size={16} className="tint-text" />}
           <input 
             className={`font-medium text-sm bg-transparent outline-none w-full ${task.isCompleted ? 'text-gray-400 line-through' : 'text-gray-800'}`}
             value={task.desc}
@@ -215,9 +215,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
             disabled={task.isCompleted}
           />
         </div>
-        <div className="flex gap-2 text-xs">
+        <div className="flex flex-wrap gap-2 text-xs min-w-0">
           <select 
-            className="bg-gray-100 rounded px-1 py-0.5 outline-none"
+            className="bg-gray-100 rounded px-2 py-1 outline-none shrink-0"
             value={task.type}
             onChange={(e) => onUpdate({...task, type: e.target.value as any})}
             disabled={task.isCompleted}
@@ -225,7 +225,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
             <option>文书</option><option>会议</option><option>咨询</option><option>其他</option>
           </select>
           <input 
-            className="bg-transparent text-gray-500 outline-none w-24" 
+            className="bg-transparent text-gray-500 outline-none flex-1 min-w-[120px]" 
             placeholder={t('tasks.assignee')}
             value={task.assignee}
             onChange={(e) => onUpdate({...task, assignee: e.target.value})}
@@ -240,44 +240,44 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
         />
       </div>
 
-      <div className="flex sm:flex-col items-center justify-between sm:justify-center gap-2 min-w-[100px]">
+      <div className="flex sm:flex-col items-center justify-between sm:justify-center gap-2 min-w-[120px]">
         {task.isCompleted ? (
            <div className="text-center">
-             <div className="text-xs font-bold text-[#6a5b75]">{t('tasks.done')}</div>
-             <button onClick={() => onUpdate({...task, isCompleted: false})} className="text-[10px] underline text-gray-400 hover:text-[#6b5a8b] flex items-center gap-1 mt-1">
+             <div className="text-xs font-bold tint-text">{t('tasks.done')}</div>
+             <button onClick={() => onUpdate({...task, isCompleted: false})} className="text-[10px] underline text-gray-400 hover:tint-text flex items-center gap-1 mt-1">
                <RotateCcw size={10} /> {t('tasks.reopen')}
              </button>
            </div>
         ) : (
           <>
-            <div className="font-mono text-lg font-semibold text-[#4f445a] cursor-help" title="Total duration">{formatTimeDuration(duration)}</div>
-            <div className="flex gap-1 w-full items-center justify-center">
+            <div className="font-mono text-lg font-semibold tint-text cursor-help" title="Total duration">{formatTimeDuration(duration)}</div>
+            <div className="flex gap-2 w-full items-center justify-center">
               <button 
                 onClick={toggleTimer}
-                className="flex-1 flex items-center justify-center p-1 rounded text-white text-xs transition-colors accent-bg accent-bg-hover"
+                className="flex-1 flex items-center justify-center h-10 sm:h-8 rounded text-white text-xs sm:text-[11px] transition-colors accent-bg accent-bg-hover min-w-[44px]"
               >
-                {task.isRunning ? <Pause size={14} /> : <Play size={14} />}
+                {task.isRunning ? <Pause size={16} /> : <Play size={16} />}
               </button>
               
               <div className="relative">
                   <button 
                     onClick={() => setShowManualInput(!showManualInput)} 
-                    className={`p-1 rounded hover:bg-[#efe6f5] hover:text-[#6b5a8b] transition-colors ${showManualInput ? 'bg-[#efe6f5] text-[#6b5a8b]' : 'bg-gray-100 text-gray-600'}`}
+                    className={`h-10 w-10 sm:h-8 sm:w-8 rounded hover:tint-bg hover:tint-text transition-colors flex items-center justify-center ${showManualInput ? 'tint-bg tint-text' : 'bg-gray-100 text-gray-600'}`}
                     title="Add/Subtract Time"
                     type="button"
                   >
-                    <Clock size={14} />
+                    <Clock size={16} />
                   </button>
               </div>
 
-              <button onClick={completeTask} className="p-1 rounded bg-gray-100 hover:bg-[#f0e8f2] text-gray-600 hover:text-[#6a5b75] transition-colors">
-                <CheckCircle size={14} />
+              <button onClick={completeTask} className="h-10 w-10 sm:h-8 sm:w-8 rounded bg-gray-100 hover:tint-bg text-gray-600 hover:tint-text transition-colors flex items-center justify-center">
+                <CheckCircle size={16} />
               </button>
             </div>
           </>
         )}
-         <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-[#7a4f69] transition-all absolute top-2 right-2 sm:static">
-             <Trash2 size={12} />
+         <button onClick={() => onDelete(task.id)} className="opacity-70 sm:opacity-0 group-hover:opacity-100 text-gray-400 hover:tint-text transition-all absolute top-2 right-2 sm:static h-8 w-8 flex items-center justify-center">
+             <Trash2 size={14} />
         </button>
       </div>
       <div className="mt-2">
@@ -320,7 +320,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
                   )}
                   <button
                     type="button"
-                    className="text-xs px-2 py-1 rounded bg-[#f8eeef] text-[#7a4f69] border border-[#e2c7d1] hover:bg-[#f2e4e9]"
+                    className="text-xs px-2 py-1 rounded tint-bg tint-text border tint-border hover:tint-bg-strong"
                     onClick={() => deleteSession(idx)}
                   >Delete</button>
                 </div>
@@ -335,13 +335,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
       {showManualInput && (
         <div className="fixed inset-0 z-[140] bg-black/20 backdrop-blur-[2px] flex items-center justify-center p-3" onClick={() => setShowManualInput(false)}>
           <div className="craft-surface w-[360px] max-w-[95vw] p-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
-            <div className="text-xs font-bold text-[#4f445a] mb-2">{t('tasks.manualSession')}</div>
+            <div className="text-xs font-bold tint-text mb-2">{t('tasks.manualSession')}</div>
             <div className="space-y-2">
               <div>
                 <label className="text-[10px] text-gray-500 block mb-1">{t('tasks.startTime')}</label>
                 <input
                   type="datetime-local"
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs outline-none focus:border-[#8a6d95]"
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs outline-none focus:border-[var(--ui-accent)]"
                   value={manualStart}
                   onChange={e => setManualStart(e.target.value)}
                 />
@@ -350,7 +350,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
                 <label className="text-[10px] text-gray-500 block mb-1">{t('tasks.endTime')}</label>
                 <input
                   type="datetime-local"
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs outline-none focus:border-[#8a6d95]"
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs outline-none focus:border-[var(--ui-accent)]"
                   value={manualEnd}
                   onChange={e => setManualEnd(e.target.value)}
                 />
@@ -545,12 +545,12 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
         {/* Client Info */}
         <div className="craft-panel p-4 shadow-sm group">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-xs font-bold text-[#6f6377] uppercase flex items-center gap-2"><MessageSquare size={14}/>{t('info.client')}</h3>
-            <button onClick={() => addPartyToCase(true)} className="text-xs text-[#6b5a8b] hover:underline">{t('info.addClient')}</button>
+            <h3 className="text-xs font-bold tint-text uppercase flex items-center gap-2"><MessageSquare size={14}/>{t('info.client')}</h3>
+            <button onClick={() => addPartyToCase(true)} className="text-xs tint-text hover:underline">{t('info.addClient')}</button>
           </div>
           {c.clients.map(p => (
              <div key={p.id} className="mb-4 last:mb-0 pb-4 border-b border-gray-50 last:border-0 relative min-w-0">
-               <button disabled={!editing} onClick={() => removeParty(true, p.id)} className={`absolute right-0 top-0 ${editing ? 'text-gray-300 hover:text-[#7a4f69]' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>
+               <button disabled={!editing} onClick={() => removeParty(true, p.id)} className={`absolute right-0 top-0 ${editing ? 'text-gray-300 hover:tint-text' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>
                <div className="flex gap-2 mb-2 min-w-0 items-start">
                   <select 
                     className="text-lg bg-transparent outline-none cursor-pointer shrink-0"
@@ -562,7 +562,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                     <option value="individual">👤</option>
                   </select>
                   <input 
-                    className="font-medium text-[#3f2f4d] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none w-full min-w-0 transition-colors"
+                    className="font-medium tint-text bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[var(--ui-accent)] outline-none w-full min-w-0 transition-colors"
                     placeholder={t('info.client')}
                     value={p.name}
                     onChange={(e) => handlePartyUpdate(true, p.id, 'name', e.target.value)}
@@ -599,18 +599,18 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
           <div className="mt-4 pt-4 border-t border-[#e8dfeb] text-sm">
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                <div className="min-w-0">
-                  <label className="block text-xs text-[#8a8092] mb-1">{t('info.contactPerson')}</label>
+                  <label className="block text-xs tint-text mb-1">{t('info.contactPerson')}</label>
                   <input 
-                    className="w-full min-w-0 text-[#3f2f4d] border-b border-transparent hover:border-gray-200 focus:border-[#8a6d95] outline-none bg-transparent"
+                    className="w-full min-w-0 tint-text border-b border-transparent hover:border-gray-200 focus:border-[var(--ui-accent)] outline-none bg-transparent"
                     placeholder={t('info.contactPerson')}
                     value={c.clientContactName || ''}
                     onChange={(e) => editing && onDraftUpdate({...c, clientContactName: e.target.value})}
                   />
                </div>
                <div className="min-w-0">
-                  <label className="block text-xs text-[#8a8092] mb-1">{t('info.contactInfo')}</label>
+                  <label className="block text-xs tint-text mb-1">{t('info.contactInfo')}</label>
                   <input 
-                    className="w-full min-w-0 text-[#3f2f4d] border-b border-transparent hover:border-gray-200 focus:border-[#8a6d95] outline-none bg-transparent"
+                    className="w-full min-w-0 tint-text border-b border-transparent hover:border-gray-200 focus:border-[var(--ui-accent)] outline-none bg-transparent"
                     placeholder={t('info.contactInfo')}
                     value={c.clientContactInfo || ''}
                     onChange={(e) => editing && onDraftUpdate({...c, clientContactInfo: e.target.value})}
@@ -623,12 +623,12 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
         {/* Opponent Info */}
         <div className="craft-panel p-4 shadow-sm group">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-xs font-bold text-[#6f6377] uppercase flex items-center gap-2"><Scale size={14}/>{t('info.opponent')}</h3>
-            <button onClick={() => addPartyToCase(false)} className="text-xs text-[#6b5a8b] hover:underline">{t('info.addOpponent')}</button>
+            <h3 className="text-xs font-bold tint-text uppercase flex items-center gap-2"><Scale size={14}/>{t('info.opponent')}</h3>
+            <button onClick={() => addPartyToCase(false)} className="text-xs tint-text hover:underline">{t('info.addOpponent')}</button>
           </div>
           {c.opponents.map(p => (
              <div key={p.id} className="mb-4 last:mb-0 pb-4 border-b border-gray-50 last:border-0 relative min-w-0">
-               <button disabled={!editing} onClick={() => removeParty(false, p.id)} className={`absolute right-0 top-0 ${editing ? 'text-gray-300 hover:text-[#7a4f69]' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>
+               <button disabled={!editing} onClick={() => removeParty(false, p.id)} className={`absolute right-0 top-0 ${editing ? 'text-gray-300 hover:tint-text' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>
                <div className="flex gap-2 mb-2 min-w-0 items-start">
                   <select 
                     className="text-lg bg-transparent outline-none cursor-pointer shrink-0"
@@ -640,7 +640,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                     <option value="individual">👤</option>
                   </select>
                   <input 
-                    className="font-medium text-[#3f2f4d] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none w-full min-w-0 transition-colors"
+                    className="font-medium tint-text bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[var(--ui-accent)] outline-none w-full min-w-0 transition-colors"
                     placeholder={t('info.opponent')}
                     value={p.name}
                     onChange={(e) => handlePartyUpdate(false, p.id, 'name', e.target.value)}
@@ -683,7 +683,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
          {showProcedure && (c.type === '诉讼' || c.type === '仲裁') && (
            <div className="craft-panel p-4 shadow-sm">
               <div className="flex justify-between items-center mb-3">
-                <h3 className="text-xs font-bold text-[#6f6377] uppercase">{t('proceedings.title')}</h3>
+                <h3 className="text-xs font-bold tint-text uppercase">{t('proceedings.title')}</h3>
                 <button 
                   onClick={() => {
                     const newProc: Proceeding = {
@@ -692,7 +692,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                     };
                     onCommitUpdate({ ...c, litigation: { ...c.litigation, proceedings: [...c.litigation.proceedings, newProc] } });
                   }}
-                  className="text-xs text-[#6b5a8b] hover:underline"
+                  className="text-xs tint-text hover:underline"
                 >{t('proceedings.addStage')}</button>
               </div>
               
@@ -700,9 +700,9 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                 <div key={proc.id} className="mb-6 last:mb-0 pb-6 border-b border-gray-100 last:border-0 relative">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2 items-start">
                       <div className="min-w-0">
-                        <label className="block text-[10px] text-[#8a8092] mb-1">{t('proceedings.stage')}</label>
+                        <label className="block text-[10px] tint-text mb-1">{t('proceedings.stage')}</label>
                         <input
-                          className="w-full min-w-0 font-semibold text-sm bg-white/90 border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                          className="w-full min-w-0 font-semibold text-sm bg-white/90 border tint-border rounded px-2 py-1.5 outline-none focus:border-[var(--ui-accent)]"
                           value={proc.stageName}
                           onChange={(e) => handleProcUpdate(proc.id, 'stageName', e.target.value)}
                           disabled={!editing}
@@ -710,9 +710,9 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                         />
                       </div>
                       <div className="min-w-0">
-                        <label className="block text-[10px] text-[#8a8092] mb-1">{t('proceedings.myRole')}</label>
+                        <label className="block text-[10px] tint-text mb-1">{t('proceedings.myRole')}</label>
                         <input
-                           className="w-full min-w-0 text-sm text-[#6f6377] bg-[#f3edf5] rounded border border-[#ddd2e3] outline-none py-1.5 px-2 focus:border-[#8a6d95]"
+                           className="w-full min-w-0 text-sm tint-text tint-bg rounded border tint-border outline-none py-1.5 px-2 focus:border-[var(--ui-accent)]"
                            value={proc.myRole}
                            onChange={(e) => handleProcUpdate(proc.id, 'myRole', e.target.value)}
                            placeholder={t('proceedings.myRole')}
@@ -721,10 +721,10 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                       </div>
                    </div>
                    <div className="mb-3">
-                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('proceedings.caseNo')}</label>
+                     <label className="block text-[10px] tint-text mb-1">{t('proceedings.caseNo')}</label>
                      <div className="flex items-center gap-2 w-full min-w-0">
                          <input
-                           className="text-xs font-mono bg-gray-50 px-2 py-1.5 rounded border border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none w-full min-w-0 text-left"
+                           className="text-xs font-mono bg-gray-50 px-2 py-1.5 rounded border border-transparent hover:border-gray-300 focus:border-[var(--ui-accent)] outline-none w-full min-w-0 text-left"
                            value={proc.caseNo}
                            onChange={(e) => handleProcUpdate(proc.id, 'caseNo', e.target.value)}
                            disabled={!editing}
@@ -733,7 +733,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                          {idx > 0 && <button disabled={!editing} onClick={() => {
                             const updated = c.litigation.proceedings.filter(p => p.id !== proc.id);
                             onCommitUpdate({ ...c, litigation: { ...c.litigation, proceedings: updated } });
-                         }} className={`${editing ? 'text-gray-300 hover:text-[#7a4f69]' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>}
+                         }} className={`${editing ? 'text-gray-300 hover:tint-text' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>}
                    </div>
                    </div>
 
@@ -742,7 +742,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                         <div className="flex items-center gap-2 min-w-0">
                            <span className="text-xs text-gray-400 w-16 shrink-0">{t('proceedings.institution')}</span>
                            <input 
-                             className="flex-1 min-w-0 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
+                             className="flex-1 min-w-0 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[var(--ui-accent)] outline-none py-1"
                              value={proc.courtName}
                              onChange={(e) => handleProcUpdate(proc.id, 'courtName', e.target.value)}
                              disabled={!editing}
@@ -752,7 +752,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                         <div className="flex items-center gap-2 min-w-0">
                            <span className="text-xs text-gray-400 w-16 shrink-0">{t('proceedings.address')}</span>
                            <input 
-                             className="flex-1 min-w-0 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
+                             className="flex-1 min-w-0 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[var(--ui-accent)] outline-none py-1"
                              value={proc.courtAddress}
                              onChange={(e) => handleProcUpdate(proc.id, 'courtAddress', e.target.value)}
                              disabled={!editing}
@@ -762,10 +762,10 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                       </div>
                       
                       {/* Personnel List */}
-                      <div className="bg-[#f7f2f8] rounded p-2 border border-[#e6dcec]">
+                      <div className="tint-bg rounded p-2 border tint-border">
                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-[10px] font-bold text-[#8a8092] uppercase">{t('proceedings.personnel')}</span>
-                            <button onClick={() => handleAddPerson(proc.id)} className="text-[10px] text-[#6b5a8b] hover:underline">+ Add Person</button>
+                            <span className="text-[10px] font-bold tint-text uppercase">{t('proceedings.personnel')}</span>
+                            <button onClick={() => handleAddPerson(proc.id)} className="text-[10px] tint-text hover:underline">+ Add Person</button>
                          </div>
                          {(proc.personnel || []).map((per: any) => (
                             <div key={per.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center mb-2 last:mb-0 group">
@@ -777,27 +777,27 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                                  placeholder="Role"
                                />
                                <input 
-                                 className="sm:col-span-3 text-xs bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
+                                 className="sm:col-span-3 text-xs bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[var(--ui-accent)] outline-none py-1"
                                  value={per.name}
                                  onChange={(e) => handleUpdatePerson(proc.id, per.id, 'name', e.target.value)}
                                  disabled={!editing}
                                  placeholder="Name"
                                />
                                <input 
-                                 className="sm:col-span-3 text-xs bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
+                                 className="sm:col-span-3 text-xs bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[var(--ui-accent)] outline-none py-1"
                                  value={per.contact}
                                  onChange={(e) => handleUpdatePerson(proc.id, per.id, 'contact', e.target.value)}
                                  disabled={!editing}
                                  placeholder="Contact"
                                />
                                <input 
-                                 className="sm:col-span-3 text-xs bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
+                                 className="sm:col-span-3 text-xs bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[var(--ui-accent)] outline-none py-1"
                                  value={per.note || ''}
                                  onChange={(e) => handleUpdatePerson(proc.id, per.id, 'note', e.target.value)}
                                  disabled={!editing}
                                  placeholder="Notes"
                                />
-                               <button disabled={!editing} onClick={() => handleRemovePerson(proc.id, per.id)} className={`sm:col-span-1 justify-self-end ${editing ? 'opacity-70 sm:opacity-0 sm:group-hover:opacity-100 text-gray-300 hover:text-[#7a4f69]' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={12}/></button>
+                               <button disabled={!editing} onClick={() => handleRemovePerson(proc.id, per.id)} className={`sm:col-span-1 justify-self-end ${editing ? 'opacity-70 sm:opacity-0 sm:group-hover:opacity-100 text-gray-300 hover:tint-text' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={12}/></button>
                             </div>
                          ))}
                          {(proc.personnel || []).length === 0 && <div className="text-xs text-gray-400 italic text-center py-2">{t('proceedings.noPersonnel')}</div>}
@@ -811,64 +811,64 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
          {showProcedure && c.type === '诉讼' && (
            <div className="craft-panel p-4 shadow-sm">
              <div className="flex justify-between items-center mb-3">
-               <h3 className="text-xs font-bold text-[#6f6377] uppercase">{t('preservation.title')}</h3>
-               <button onClick={handleAddPreservation} className="text-xs text-[#6b5a8b] hover:underline">{t('preservation.add')}</button>
+               <h3 className="text-xs font-bold tint-text uppercase">{t('preservation.title')}</h3>
+               <button onClick={handleAddPreservation} className="text-xs tint-text hover:underline">{t('preservation.add')}</button>
              </div>
 
              {(c.litigation.propertyPreservations || []).map((item) => (
-               <div key={item.id} className="mb-4 last:mb-0 p-3 rounded-xl border border-[#e6dcec] bg-[#f7f2f8]">
+               <div key={item.id} className="mb-4 last:mb-0 p-3 rounded-xl border tint-border tint-bg">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                    <div>
-                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('preservation.caseNo')}</label>
+                     <label className="block text-[10px] tint-text mb-1">{t('preservation.caseNo')}</label>
                      <input
-                       className="w-full text-xs bg-white border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                       className="w-full text-xs bg-white border tint-border rounded px-2 py-1.5 outline-none focus:border-[var(--ui-accent)]"
                        value={item.caseNo}
                        onChange={(e) => handleUpdatePreservation(item.id, 'caseNo', e.target.value)}
                        disabled={!editing}
                      />
                    </div>
                    <div>
-                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('preservation.court')}</label>
+                     <label className="block text-[10px] tint-text mb-1">{t('preservation.court')}</label>
                      <input
-                       className="w-full text-xs bg-white border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                       className="w-full text-xs bg-white border tint-border rounded px-2 py-1.5 outline-none focus:border-[var(--ui-accent)]"
                        value={item.courtName}
                        onChange={(e) => handleUpdatePreservation(item.id, 'courtName', e.target.value)}
                        disabled={!editing}
                      />
                    </div>
                    <div className="md:col-span-2">
-                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('preservation.assets')}</label>
+                     <label className="block text-[10px] tint-text mb-1">{t('preservation.assets')}</label>
                      <input
-                       className="w-full text-xs bg-white border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                       className="w-full text-xs bg-white border tint-border rounded px-2 py-1.5 outline-none focus:border-[var(--ui-accent)]"
                        value={item.assetDetails}
                        onChange={(e) => handleUpdatePreservation(item.id, 'assetDetails', e.target.value)}
                        disabled={!editing}
                      />
                    </div>
                    <div>
-                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('preservation.deadline')}</label>
+                     <label className="block text-[10px] tint-text mb-1">{t('preservation.deadline')}</label>
                      <input
                        type="date"
-                       className="w-full text-xs bg-white border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                       className="w-full text-xs bg-white border tint-border rounded px-2 py-1.5 outline-none focus:border-[var(--ui-accent)]"
                        value={item.deadlineDate || ''}
                        onChange={(e) => handleUpdatePreservation(item.id, 'deadlineDate', e.target.value)}
                        disabled={!editing}
                      />
                    </div>
                    <div>
-                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('preservation.judge')}</label>
+                     <label className="block text-[10px] tint-text mb-1">{t('preservation.judge')}</label>
                      <input
-                       className="w-full text-xs bg-white border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                       className="w-full text-xs bg-white border tint-border rounded px-2 py-1.5 outline-none focus:border-[var(--ui-accent)]"
                        value={item.judgeName}
                        onChange={(e) => handleUpdatePreservation(item.id, 'judgeName', e.target.value)}
                        disabled={!editing}
                      />
                    </div>
                    <div className="md:col-span-2">
-                     <label className="block text-[10px] text-[#8a8092] mb-1">{t('preservation.judgeContact')}</label>
+                     <label className="block text-[10px] tint-text mb-1">{t('preservation.judgeContact')}</label>
                      <div className="flex items-center gap-2">
                        <input
-                         className="w-full text-xs bg-white border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                         className="w-full text-xs bg-white border tint-border rounded px-2 py-1.5 outline-none focus:border-[var(--ui-accent)]"
                          value={item.judgeContact}
                          onChange={(e) => handleUpdatePreservation(item.id, 'judgeContact', e.target.value)}
                          disabled={!editing}
@@ -876,7 +876,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                        <button
                          disabled={!editing}
                          onClick={() => handleRemovePreservation(item.id)}
-                         className={`${editing ? 'text-gray-300 hover:text-[#7a4f69]' : 'text-gray-200 cursor-not-allowed'}`}
+                         className={`${editing ? 'text-gray-300 hover:tint-text' : 'text-gray-200 cursor-not-allowed'}`}
                        >
                          <Trash2 size={14}/>
                        </button>
@@ -894,9 +894,9 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
          {/* Special Project Scope */}
          {showInfo && showSpecialProject && (
            <div className="craft-panel p-4 shadow-sm">
-              <h3 className="text-xs font-bold text-[#6f6377] uppercase mb-3">{t('detail.projectScope')}</h3>
+              <h3 className="text-xs font-bold tint-text uppercase mb-3">{t('detail.projectScope')}</h3>
               <textarea 
-                className="w-full text-sm text-[#4f445a] min-h-[150px] border border-transparent hover:border-gray-200 focus:border-[#8a6d95] rounded p-2 outline-none resize-y"
+                className="w-full text-sm tint-text min-h-[150px] border border-transparent hover:border-gray-200 focus:border-[var(--ui-accent)] rounded p-2 outline-none resize-y"
                 value={c.specialProjectRemarks || ''}
                 onChange={(e) => editing && onDraftUpdate({...c, specialProjectRemarks: e.target.value})}
                 placeholder="Describe the project scope, goals, and deliverables..."
@@ -1066,25 +1066,36 @@ export const CaseDetail: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col craft-surface">
+    <div className="h-full flex flex-col craft-surface min-w-0 overflow-x-hidden">
       {/* Header */}
       <div className="px-3 md:px-8 py-3 md:py-5 border-b border-[#e2e8f0] sticky top-0 bg-[#f8fbff]/85 backdrop-blur-xl z-10 flex flex-col lg:flex-row justify-between lg:items-start gap-3 md:gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-2 text-sm text-slate-500">
              <span className="cursor-pointer hover:underline" onClick={() => navigate('dashboard')}>{t('breadcrumbs.dashboard')}</span> / <span>{t('breadcrumbs.cases')}</span>
           </div>
-          <h1 className="min-w-0 text-[clamp(1.5rem,3.6vw,2.4rem)] leading-[1.15] font-bold text-[#1f2937] flex items-start gap-2 md:gap-3">
-            <span className="min-w-0 break-words">{currentCase.name}</span>
+          <div className="min-w-0 flex items-start gap-2 md:gap-3">
+            {isEditing && draftCase ? (
+              <input
+                className="min-w-0 flex-1 text-[clamp(1.5rem,3.6vw,2.4rem)] leading-[1.15] font-bold text-[#1f2937] bg-transparent border-b border-[#d9e1ed] focus:border-[var(--ui-accent)] outline-none"
+                value={draftCase.name}
+                onChange={(e) => setDraftCase({ ...draftCase, name: e.target.value })}
+                placeholder={t('case.create.name')}
+              />
+            ) : (
+              <h1 className="min-w-0 flex-1 text-[clamp(1.5rem,3.6vw,2.4rem)] leading-[1.15] font-bold text-[#1f2937] break-words">
+                {currentCase.name}
+              </h1>
+            )}
             <span className="shrink-0 mt-1">
               <StatusBadge status={currentCase.status} />
             </span>
-          </h1>
+          </div>
           <div className="text-xs md:text-sm text-slate-500 mt-1 flex gap-3 flex-wrap">
              <span>{currentCase.type}</span>
              {currentCase.updatedAt && <span>• Updated {new Date(currentCase.updatedAt).toLocaleString()}</span>}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto min-w-0">
            {!isEditing ? (
              <button onClick={() => { setIsEditing(true); setDraftCase(currentCase); }} className="px-3 py-1.5 border border-[#d9e1ed] bg-white rounded-xl text-sm whitespace-nowrap hover:bg-gray-50">{t('actions.edit')}</button>
            ) : (
@@ -1092,10 +1103,10 @@ export const CaseDetail: React.FC = () => {
            )}
            <button 
              onClick={() => setShowDeleteConfirm(true)}
-             className="px-3 py-1.5 border border-[#d6b8c6] text-[#7a4f69] rounded-xl text-sm whitespace-nowrap hover:bg-[#f8eeef]"
+             className="px-3 py-1.5 border tint-border tint-text rounded-xl text-sm whitespace-nowrap hover:tint-bg"
            >{t('actions.deleteCase')}</button>
            <select 
-             className="px-3 py-1.5 border border-[#d9e1ed] bg-white rounded-xl text-sm min-w-[112px] hover:bg-gray-50 outline-none cursor-pointer"
+             className="px-3 py-1.5 border border-[#d9e1ed] bg-white rounded-xl text-sm min-w-[112px] max-w-full hover:bg-gray-50 outline-none cursor-pointer"
              value={currentCase.status}
              onChange={handleStatusChange}
            >
@@ -1107,7 +1118,7 @@ export const CaseDetail: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="px-3 md:px-8 py-2.5 border-b border-[#e2e8f0] flex gap-2 text-sm overflow-x-auto scrollbar-hide snap-x snap-mandatory">
+      <div className="w-full px-3 md:px-8 py-2.5 border-b border-[#e2e8f0] flex gap-2 text-sm overflow-x-auto overflow-y-hidden scrollbar-hide snap-x snap-mandatory">
         {['info', 'procedure', 'tasks', 'schedule', 'deadlines', 'logs', 'trash'].map(tab => (
           <div 
             key={tab}
@@ -1120,8 +1131,8 @@ export const CaseDetail: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-2.5 md:p-8 pb-24 md:pb-8 bg-gradient-to-b from-[#f8fbff]/70 to-[#f4f8ff]/45">
-        <div className="max-w-5xl mx-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2.5 md:p-8 pb-24 md:pb-8 bg-gradient-to-b from-[#f8fbff]/70 to-[#f4f8ff]/45">
+        <div className="w-full max-w-5xl mx-auto min-w-0">
           
           {activeTab === 'info' && draftCase && (
             <InfoTab 
@@ -1148,7 +1159,7 @@ export const CaseDetail: React.FC = () => {
           {activeTab === 'tasks' && (
             <div className="animate-fade-in">
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-4">
-                 <h3 className="font-bold text-[#4f445a]">{t('tasks.title')} ({currentCase.tasks.length})</h3>
+                 <h3 className="font-bold tint-text">{t('tasks.title')} ({currentCase.tasks.length})</h3>
                  <div className="flex gap-2 w-full sm:w-auto">
                     <button 
                       onClick={() => {
@@ -1217,7 +1228,7 @@ export const CaseDetail: React.FC = () => {
               <div className="mb-6 flex flex-col sm:flex-row gap-2">
                  <textarea
                    id="logInput"
-                   className="w-full border border-[#d9cfde] rounded-xl p-3 text-sm bg-white/90 text-[#3f2f4d] focus:ring-2 focus:ring-[#e7d9ee] outline-none"
+                   className="w-full border border-[#d9cfde] rounded-xl p-3 text-sm bg-white/90 tint-text focus:ring-2 focus:ring-[var(--ui-accent-soft-2)] outline-none"
                    placeholder={t('logs.placeholder')}
                    rows={2}
                    onKeyDown={(e) => {
@@ -1237,17 +1248,17 @@ export const CaseDetail: React.FC = () => {
                     className="accent-bg accent-bg-hover text-white px-4 py-2 rounded transition-colors sm:self-auto self-end"
                  >{t('logs.post')}</button>
                </div>
-               <div className="space-y-6 relative border-l border-[#ddd2e3] ml-4 pl-8">
+               <div className="space-y-6 relative border-l tint-border ml-4 pl-8">
                  {currentCase.logs.map(log => (
                    <div key={log.id} className="relative group">
                      <div className="absolute -left-[39px] top-1 h-5 w-5 rounded-full bg-white border-2 border-[#d2c3da] z-10"></div>
                      <div className="text-xs text-gray-400 mb-1">{formatDateTime(log.date)}</div>
-                     <div className="bg-white/92 p-3 rounded-xl border border-[#ddd2e3] text-sm shadow-sm text-[#3f2f4d] whitespace-pre-wrap">
+                     <div className="bg-white/92 p-3 rounded-xl border tint-border text-sm shadow-sm tint-text whitespace-pre-wrap">
                        {log.content}
                      </div>
                      <button 
                        onClick={() => handleDeleteLog(log.id)}
-                       className="absolute top-0 right-0 p-2 text-gray-300 hover:text-[#7a4f69] opacity-0 group-hover:opacity-100 transition-opacity"
+                       className="absolute top-0 right-0 p-2 text-gray-300 hover:tint-text opacity-0 group-hover:opacity-100 transition-opacity"
                      >
                        <Trash2 size={12}/>
                      </button>
@@ -1259,17 +1270,17 @@ export const CaseDetail: React.FC = () => {
 
           {activeTab === 'schedule' && (
             <div className="animate-fade-in">
-              <div className="bg-[#f4edf8] border border-[#dbcde6] p-4 rounded-lg mb-6 flex flex-col sm:flex-row sm:items-end gap-2">
+              <div className="tint-bg border tint-border p-4 rounded-lg mb-6 flex flex-col sm:flex-row sm:items-end gap-2 min-w-0">
                <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                 <div className="col-span-2">
-                     <label className="block text-xs text-[#5b4f78] font-bold mb-1">{t('schedule.newEvent')}</label>
-                     <input id="sch-title" placeholder={t('schedule.eventPlaceholder')} className="w-full text-sm p-2 rounded border border-[#dbcde6] outline-none" />
+                 <div className="sm:col-span-2">
+                     <label className="block text-xs tint-text font-bold mb-1">{t('schedule.newEvent')}</label>
+                     <input id="sch-title" placeholder={t('schedule.eventPlaceholder')} className="w-full text-sm p-2 rounded border tint-border outline-none" />
                  </div>
                  <div>
-                     <label className="block text-xs text-[#5b4f78] font-bold mb-1">{t('schedule.dateTime')}</label>
-                    <div className="flex gap-1">
-                       <input id="sch-date" type="date" className="w-full text-sm p-2 rounded border border-[#dbcde6] outline-none" />
-                       <input id="sch-time" type="time" className="w-24 text-sm p-2 rounded border border-[#dbcde6] outline-none" />
+                     <label className="block text-xs tint-text font-bold mb-1">{t('schedule.dateTime')}</label>
+                    <div className="flex flex-col sm:flex-row gap-1 min-w-0">
+                       <input id="sch-date" type="date" className="w-full text-sm p-2 rounded border tint-border outline-none" />
+                       <input id="sch-time" type="time" className="w-full sm:w-24 text-sm p-2 rounded border tint-border outline-none" />
                     </div>
                  </div>
                </div>
@@ -1290,38 +1301,38 @@ export const CaseDetail: React.FC = () => {
 
               <div className="space-y-2">
                 {currentCase.reminders.sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time)).map(r => (
-                  <div key={r.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl border bg-white/92 border-[#dbcde6] shadow-sm">
+                  <div key={r.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl border bg-white/92 tint-border shadow-sm min-w-0">
                     {editingReminderId === r.id ? (
-                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end mr-4">
+                      <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end sm:mr-4">
                         <div>
-                          <label className="block text-[10px] text-[#7a7083] mb-1">Title</label>
-                          <input className="w-full text-sm p-2 rounded border border-[#ddd2e3] outline-none text-[#3f2f4d]" value={remEditTitle} onChange={e => setRemEditTitle(e.target.value)} />
+                          <label className="block text-[10px] tint-text mb-1">Title</label>
+                          <input className="w-full text-sm p-2 rounded border tint-border outline-none tint-text" value={remEditTitle} onChange={e => setRemEditTitle(e.target.value)} />
                         </div>
                         <div>
-                          <label className="block text-[10px] text-[#7a7083] mb-1">Date</label>
-                          <input type="date" className="w-full text-sm p-2 rounded border border-[#ddd2e3] outline-none text-[#3f2f4d]" value={remEditDate} onChange={e => setRemEditDate(e.target.value)} />
+                          <label className="block text-[10px] tint-text mb-1">Date</label>
+                          <input type="date" className="w-full text-sm p-2 rounded border tint-border outline-none tint-text" value={remEditDate} onChange={e => setRemEditDate(e.target.value)} />
                         </div>
                         <div>
-                          <label className="block text-[10px] text-[#7a7083] mb-1">Time</label>
-                          <input type="time" className="w-full text-sm p-2 rounded border border-[#ddd2e3] outline-none text-[#3f2f4d]" value={remEditTime} onChange={e => setRemEditTime(e.target.value)} />
+                          <label className="block text-[10px] tint-text mb-1">Time</label>
+                          <input type="time" className="w-full text-sm p-2 rounded border tint-border outline-none tint-text" value={remEditTime} onChange={e => setRemEditTime(e.target.value)} />
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-4">
-                        <div className="text-center min-w-[60px]">
-                          <div className="text-xs text-[#7a7083] uppercase font-bold">{new Date(r.date).toLocaleString('default', { month: 'short' })}</div>
-                          <div className="text-xl font-bold text-[#3f2f4d] leading-none">{new Date(r.date).getDate()}</div>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="text-center shrink-0 min-w-[56px]">
+                          <div className="text-xs tint-text uppercase font-bold">{new Date(r.date).toLocaleString('default', { month: 'short' })}</div>
+                          <div className="text-xl font-bold tint-text leading-none">{new Date(r.date).getDate()}</div>
                           <div className="text-xs text-gray-400">{r.time}</div>
                         </div>
-                        <div className="h-8 w-px bg-[#ddd2e3]"></div>
-                        <div className="font-medium text-sm text-[#3f2f4d]">{r.title}</div>
+                        <div className="h-8 w-px tint-bg"></div>
+                        <div className="font-medium text-sm tint-text min-w-0 break-words">{r.title}</div>
                       </div>
                     )}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       {editingReminderId === r.id ? (
                         <>
                           <button 
-                            className="text-sm px-3 py-1 border border-[#ddd2e3] rounded hover:bg-white"
+                            className="text-sm px-3 py-1 border tint-border rounded hover:bg-white"
                             onClick={() => {
                               const newReminders = currentCase.reminders.map(x => x.id === r.id ? { ...x, title: remEditTitle, date: remEditDate, time: remEditTime || x.time } : x);
                               updateCase({ ...currentCase, reminders: newReminders });
@@ -1332,17 +1343,17 @@ export const CaseDetail: React.FC = () => {
                             }}
                           >Save</button>
                           <button 
-                            className="text-sm px-3 py-1 border border-[#ddd2e3] rounded hover:bg-white"
+                            className="text-sm px-3 py-1 border tint-border rounded hover:bg-white"
                             onClick={() => { setEditingReminderId(null); }}
                           >Cancel</button>
                         </>
                       ) : (
                         <>
                           <button 
-                            className="text-gray-400 hover:text-[#6b5a8b]"
+                            className="text-gray-400 hover:tint-text"
                             onClick={() => { setEditingReminderId(r.id); setRemEditTitle(r.title); setRemEditDate(r.date); setRemEditTime(r.time); }}
                           ><Edit2 size={14}/></button>
-                          <button onClick={() => handleDeleteReminder(r.id)} className="text-gray-300 hover:text-[#7a4f69]"><Trash2 size={14}/></button>
+                          <button onClick={() => handleDeleteReminder(r.id)} className="text-gray-300 hover:tint-text"><Trash2 size={14}/></button>
                         </>
                       )}
                     </div>
@@ -1355,14 +1366,14 @@ export const CaseDetail: React.FC = () => {
 
           {activeTab === 'deadlines' && (
             <div className="animate-fade-in">
-              <div className="bg-[#f8eeef] border border-[#e7d2d8] p-4 rounded-lg mb-6 flex flex-col sm:flex-row sm:items-end gap-2">
-                <div className="flex-1">
-                  <label className="block text-xs text-[#7a4f69] font-bold mb-1">{t('deadlines.new')}</label>
-                  <input id="dl-title" placeholder="Description (e.g. Evidence Submission)" className="w-full text-sm p-2 rounded border border-[#e2c7d1] outline-none mb-2" />
-                  <input id="dl-date" type="date" className="w-full text-sm p-2 rounded border border-[#e2c7d1] outline-none" />
+              <div className="tint-bg border tint-border p-4 rounded-lg mb-6 flex flex-col sm:flex-row sm:items-end gap-2 min-w-0">
+                <div className="flex-1 min-w-0">
+                  <label className="block text-xs tint-text font-bold mb-1">{t('deadlines.new')}</label>
+                  <input id="dl-title" placeholder="Description (e.g. Evidence Submission)" className="w-full text-sm p-2 rounded border tint-border outline-none mb-2" />
+                  <input id="dl-date" type="date" className="w-full text-sm p-2 rounded border tint-border outline-none" />
                 </div>
                 <button 
-                  className="bg-[#7a4f69] text-white px-4 py-2 rounded text-sm hover:bg-[#683f56] shadow-sm w-full sm:w-auto"
+                  className="accent-bg text-white px-4 py-2 rounded text-sm accent-bg-hover shadow-sm w-full sm:w-auto"
                   onClick={() => {
                     const t = (document.getElementById('dl-title') as HTMLInputElement).value;
                     const d = (document.getElementById('dl-date') as HTMLInputElement).value;
@@ -1376,8 +1387,8 @@ export const CaseDetail: React.FC = () => {
 
               <div className="space-y-2">
                 {currentCase.deadlines.map(dl => (
-                  <div key={dl.id} className={`flex items-center justify-between p-3 rounded-xl border ${dl.completed ? 'bg-[#f5f1f6] border-[#ddd2e3] opacity-70' : 'bg-white/92 border-[#e2c7d1] shadow-sm'}`}>
-                    <div className="flex items-center gap-3">
+                  <div key={dl.id} className={`flex items-center justify-between gap-2 p-3 rounded-xl border min-w-0 ${dl.completed ? 'tint-bg border tint-border opacity-70' : 'bg-white/92 border tint-border shadow-sm'}`}>
+                    <div className="flex items-center gap-3 min-w-0">
                        <input 
                          type="checkbox" 
                          checked={dl.completed} 
@@ -1385,14 +1396,14 @@ export const CaseDetail: React.FC = () => {
                             const newDLs = currentCase.deadlines.map(x => x.id === dl.id ? {...x, completed: !x.completed} : x);
                             updateCase({...currentCase, deadlines: newDLs});
                          }}
-                         className="w-4 h-4 rounded border-gray-300 text-[#7a4f69] focus:ring-[#d6b8c6]"
+                         className="w-4 h-4 rounded border-gray-300 accent-text focus:ring-[var(--ui-accent-soft-2)]"
                        />
-                       <div>
-                         <div className={`font-medium text-sm ${dl.completed ? 'line-through text-[#847b8d]' : 'text-[#3f2f4d]'}`}>{dl.title}</div>
-                         <div className="text-xs text-[#7a4f69] font-mono">{dl.date}</div>
+                       <div className="min-w-0">
+                         <div className={`font-medium text-sm break-words ${dl.completed ? 'line-through text-[#847b8d]' : 'tint-text'}`}>{dl.title}</div>
+                         <div className="text-xs tint-text font-mono">{dl.date}</div>
                        </div>
                     </div>
-                    <button onClick={() => handleDeleteDeadline(dl.id)} className="text-gray-300 hover:text-[#7a4f69]"><Trash2 size={14}/></button>
+                    <button onClick={() => handleDeleteDeadline(dl.id)} className="text-gray-300 hover:tint-text shrink-0"><Trash2 size={14}/></button>
                   </div>
                 ))}
               </div>
@@ -1401,17 +1412,17 @@ export const CaseDetail: React.FC = () => {
 
           {activeTab === 'trash' && (
             <div className="animate-fade-in">
-               <h3 className="font-bold text-[#4f445a] mb-4">Recycle Bin</h3>
+               <h3 className="font-bold tint-text mb-4">Recycle Bin</h3>
                <div className="space-y-6">
                   {/* Tasks */}
                   <div>
-                     <h4 className="text-sm font-bold text-[#6f6377] mb-2 flex items-center gap-2"><CheckCircle size={14}/> Deleted Tasks</h4>
+                     <h4 className="text-sm font-bold tint-text mb-2 flex items-center gap-2"><CheckCircle size={14}/> Deleted Tasks</h4>
                      {getTrash().tasks.length === 0 ? <div className="text-xs text-gray-400 italic">No deleted tasks.</div> : 
                        <div className="space-y-2">
                          {getTrash().tasks.map(t => (
-                           <div key={t.id} className="flex justify-between items-center p-2 bg-[#f5f1f6] border border-[#ddd2e3] rounded-xl">
-                              <span className="text-sm text-[#7a7083] line-through">{t.desc}</span>
-                              <button onClick={() => handleRestore('task', t.id)} className="text-xs text-[#6b5a8b] hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
+                           <div key={t.id} className="flex justify-between items-center p-2 tint-bg border tint-border rounded-xl">
+                              <span className="text-sm tint-text line-through">{t.desc}</span>
+                              <button onClick={() => handleRestore('task', t.id)} className="text-xs tint-text hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
                            </div>
                          ))}
                        </div>
@@ -1419,13 +1430,13 @@ export const CaseDetail: React.FC = () => {
                   </div>
                   {/* Logs */}
                   <div>
-                     <h4 className="text-sm font-bold text-[#6f6377] mb-2 flex items-center gap-2"><FileText size={14}/> Deleted Logs</h4>
+                     <h4 className="text-sm font-bold tint-text mb-2 flex items-center gap-2"><FileText size={14}/> Deleted Logs</h4>
                      {getTrash().logs.length === 0 ? <div className="text-xs text-gray-400 italic">No deleted logs.</div> : 
                        <div className="space-y-2">
                          {getTrash().logs.map(l => (
-                           <div key={l.id} className="flex justify-between items-center p-2 bg-[#f5f1f6] border border-[#ddd2e3] rounded-xl">
-                              <span className="text-sm text-[#7a7083] truncate max-w-[300px]">{l.content}</span>
-                              <button onClick={() => handleRestore('log', l.id)} className="text-xs text-[#6b5a8b] hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
+                           <div key={l.id} className="flex justify-between items-center p-2 tint-bg border tint-border rounded-xl">
+                              <span className="text-sm tint-text truncate max-w-[300px]">{l.content}</span>
+                              <button onClick={() => handleRestore('log', l.id)} className="text-xs tint-text hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
                            </div>
                          ))}
                        </div>
@@ -1433,13 +1444,13 @@ export const CaseDetail: React.FC = () => {
                   </div>
                   {/* Schedule */}
                   <div>
-                     <h4 className="text-sm font-bold text-[#6f6377] mb-2 flex items-center gap-2"><Calendar size={14}/> Deleted Schedule</h4>
+                     <h4 className="text-sm font-bold tint-text mb-2 flex items-center gap-2"><Calendar size={14}/> Deleted Schedule</h4>
                      {getTrash().reminders.length === 0 ? <div className="text-xs text-gray-400 italic">No deleted schedule items.</div> : 
                        <div className="space-y-2">
                          {getTrash().reminders.map(r => (
-                           <div key={r.id} className="flex justify-between items-center p-2 bg-[#f5f1f6] border border-[#ddd2e3] rounded-xl">
-                              <span className="text-sm text-[#7a7083]">{r.title} ({r.date})</span>
-                              <button onClick={() => handleRestore('reminder', r.id)} className="text-xs text-[#6b5a8b] hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
+                           <div key={r.id} className="flex justify-between items-center p-2 tint-bg border tint-border rounded-xl">
+                              <span className="text-sm tint-text">{r.title} ({r.date})</span>
+                              <button onClick={() => handleRestore('reminder', r.id)} className="text-xs tint-text hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
                            </div>
                          ))}
                        </div>
@@ -1447,13 +1458,13 @@ export const CaseDetail: React.FC = () => {
                   </div>
                   {/* Deadlines */}
                   <div>
-                     <h4 className="text-sm font-bold text-[#6f6377] mb-2 flex items-center gap-2"><AlertTriangle size={14}/> Deleted Deadlines</h4>
+                     <h4 className="text-sm font-bold tint-text mb-2 flex items-center gap-2"><AlertTriangle size={14}/> Deleted Deadlines</h4>
                      {getTrash().deadlines.length === 0 ? <div className="text-xs text-gray-400 italic">No deleted deadlines.</div> : 
                        <div className="space-y-2">
                          {getTrash().deadlines.map(d => (
-                           <div key={d.id} className="flex justify-between items-center p-2 bg-[#f5f1f6] border border-[#ddd2e3] rounded-xl">
-                              <span className="text-sm text-[#7a7083]">{d.title} ({d.date})</span>
-                              <button onClick={() => handleRestore('deadline', d.id)} className="text-xs text-[#6b5a8b] hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
+                           <div key={d.id} className="flex justify-between items-center p-2 tint-bg border tint-border rounded-xl">
+                              <span className="text-sm tint-text">{d.title} ({d.date})</span>
+                              <button onClick={() => handleRestore('deadline', d.id)} className="text-xs tint-text hover:underline flex items-center gap-1"><RotateCcw size={12}/> Restore</button>
                            </div>
                          ))}
                        </div>
@@ -1470,10 +1481,10 @@ export const CaseDetail: React.FC = () => {
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-3" onClick={() => setShowDeleteConfirm(false)}>
           <div className="craft-surface w-[420px] max-w-[95vw] p-6" onClick={e => e.stopPropagation()}>
             <div className="text-lg font-bold mb-2">确认删除案件</div>
-            <div className="text-sm text-[#6f6377] mb-4">此操作将移除该案件并返回仪表盘。请确认。</div>
+            <div className="text-sm tint-text mb-4">此操作将移除该案件并返回仪表盘。请确认。</div>
             <div className="flex justify-end gap-2">
-              <button className="px-3 py-1.5 border border-[#ddd2e3] rounded text-sm" onClick={() => setShowDeleteConfirm(false)}>取消</button>
-              <button className="px-3 py-1.5 border border-[#d6b8c6] text-white bg-[#7a4f69] rounded text-sm hover:bg-[#683f56]" onClick={() => { setShowDeleteConfirm(false); deleteCase(currentCase.id); }}>确认删除</button>
+              <button className="px-3 py-1.5 border tint-border rounded text-sm" onClick={() => setShowDeleteConfirm(false)}>取消</button>
+              <button className="px-3 py-1.5 border tint-border text-white accent-bg rounded text-sm accent-bg-hover" onClick={() => { setShowDeleteConfirm(false); deleteCase(currentCase.id); }}>确认删除</button>
             </div>
           </div>
         </div>

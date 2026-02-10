@@ -61,7 +61,7 @@ export const PartyManager: React.FC = () => {
       <div className="relative mb-4">
         <Search className="absolute left-3 top-3 text-slate-400" size={18} />
         <input 
-          className="w-full pl-10 pr-4 py-2.5 craft-input shadow-sm focus:outline-none focus:border-[#8a6d95] transition-colors"
+          className="w-full pl-10 pr-4 py-2.5 craft-input shadow-sm focus:outline-none focus:border-[var(--ui-accent)] transition-colors"
           placeholder="Search by name, ID code..."
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -90,8 +90,8 @@ export const PartyManager: React.FC = () => {
                <div className="hidden md:block md:col-span-3 font-mono text-slate-500 text-xs">{p.idCode || '-'}</div>
                <div className="hidden md:block md:col-span-3 text-slate-500 text-xs truncate">{p.address || '-'}</div>
                <div className="md:col-span-1 flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                 <button onClick={() => openEdit(p)} className="text-gray-400 hover:text-[#6b5a8b]"><Edit2 size={14}/></button>
-                 <button onClick={() => { if(confirm('Delete?')) deleteParty(p.id) }} className="text-gray-400 hover:text-[#7a4f69]"><Trash2 size={14}/></button>
+                 <button onClick={() => openEdit(p)} className="text-gray-400 hover:tint-text"><Edit2 size={14}/></button>
+                 <button onClick={() => { if(confirm('Delete?')) deleteParty(p.id) }} className="text-gray-400 hover:tint-text"><Trash2 size={14}/></button>
                </div>
              </div>
            ))}

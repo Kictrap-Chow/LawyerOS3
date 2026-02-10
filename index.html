@@ -18,6 +18,10 @@
         --ui-accent-2: #0f8f70;
         --ui-accent-soft: rgba(16, 163, 127, 0.12);
         --ui-accent-soft-2: rgba(16, 163, 127, 0.2);
+        --ui-tint-bg: rgba(16, 163, 127, 0.08);
+        --ui-tint-bg-strong: rgba(16, 163, 127, 0.14);
+        --ui-tint-border: rgba(16, 163, 127, 0.28);
+        --ui-tint-text: #157a64;
         --ui-warm: #DFB6B2;
         --app-font-family: "Sohne", "Söhne", "Segoe UI", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
         
@@ -30,11 +34,16 @@
       html, body, #root {
         width: 100%;
         height: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
       }
       body {
         margin: 0;
         font-family: var(--app-font-family);
         color: var(--ui-text);
+        overflow-x: hidden;
         background:
           radial-gradient(circle at 0% 0%, #fff6e8 0%, rgba(255, 246, 232, 0.7) 25%, rgba(255, 246, 232, 0) 52%),
           radial-gradient(circle at 100% 0%, #eaf4ff 0%, rgba(234, 244, 255, 0.65) 30%, rgba(234, 244, 255, 0) 58%),
@@ -105,10 +114,10 @@
       }
       .tone-ink { color: #2B124C; }
       .tone-soft { color: var(--ui-accent); }
-      .tone-muted { color: #6f6377; }
+      .tone-muted { color: var(--ui-muted); }
       .tone-accent { color: var(--ui-accent-2); }
       .bg-accent-soft { background: var(--ui-accent-soft); }
-      .bg-warm-soft { background: #f8eeef; }
+      .bg-warm-soft { background: var(--ui-tint-bg); }
       .accent-bg { background: var(--ui-accent) !important; }
       .accent-bg-hover:hover { background: var(--ui-accent-2) !important; }
       .accent-text { color: var(--ui-accent) !important; }
@@ -118,6 +127,17 @@
       .accent-soft-bg { background: var(--ui-accent-soft) !important; }
       .accent-gradient-bg { background-image: linear-gradient(135deg, var(--ui-accent), var(--ui-accent-2)); }
       .text-strong-theme { color: var(--ui-text-strong) !important; }
+      .tint-bg { background: var(--ui-tint-bg) !important; }
+      .tint-bg-strong { background: var(--ui-tint-bg-strong) !important; }
+      .tint-border { border-color: var(--ui-tint-border) !important; }
+      .tint-text { color: var(--ui-tint-text) !important; }
+      @media (max-width: 768px) {
+        input,
+        select,
+        textarea {
+          font-size: 16px !important;
+        }
+      }
     </style>
 </head>
   <body>

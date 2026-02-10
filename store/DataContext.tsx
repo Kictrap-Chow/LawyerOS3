@@ -43,8 +43,17 @@ const APP_KEY_CASES = 'lawyerCases_v18';
 const APP_KEY_PARTIES = 'lawyerParties_v18';
 const APP_KEY_TITLE = 'lawyerAppTitle_v18';
 
+const normalizeCaseType = (rawType: any) => {
+  if (rawType === '争议解决' || rawType === 'Dispute') return '诉讼';
+  if (rawType === 'Arbitration') return '仲裁';
+  if (rawType === 'Advisory') return '专项法律服务';
+  if (rawType === 'Retainer') return '常年法律顾问';
+  return rawType || '诉讼';
+};
+
 const normalizeCase = (item: any): Case => ({
   ...item,
+  type: normalizeCaseType(item?.type),
   updatedAt: item?.updatedAt || '',
   litigation: {
     proceedings: Array.isArray(item?.litigation?.proceedings) ? item.litigation.proceedings : [],
