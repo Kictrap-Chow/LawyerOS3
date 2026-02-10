@@ -198,7 +198,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!authUser?.id) {
           applyDataset([], [], false);
           setSyncStatus('offline');
-          setSyncError('Please sign in to Supabase');
+          setSyncError('请先在设置页登录后再同步');
           setIsBootstrapped(true);
           return;
         }
@@ -337,14 +337,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [authUser?.id, loadFromSupabase]);
 
   const signIn = async (email: string, password: string) => {
-    if (!supabase) return { ok: false, message: 'Supabase is not configured.' };
+    if (!supabase) return { ok: false, message: '云端同步未配置。' };
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { ok: false, message: error.message };
     return { ok: true };
   };
 
   const signUp = async (email: string, password: string) => {
-    if (!supabase) return { ok: false, message: 'Supabase is not configured.' };
+    if (!supabase) return { ok: false, message: '云端同步未配置。' };
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) return { ok: false, message: error.message };
     return { ok: true };

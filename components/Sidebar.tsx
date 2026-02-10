@@ -60,6 +60,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
   const currentSync = syncBadge();
   const SyncIcon = currentSync.icon;
   const syncedTimeLabel = lastSyncedAt ? new Date(lastSyncedAt).toLocaleString() : '-';
+  const friendlySyncError = (syncError || '')
+    .replace('Supabase load failed', '加载失败')
+    .replace('Supabase sync failed', '同步失败')
+    .replace('Please sign in to Supabase', '请先登录后同步');
 
   return (
     <div className={cn("w-[292px] h-full craft-surface flex flex-col flex-shrink-0", className)}>
@@ -189,7 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
           <div className="px-2 text-[10px] text-[#9b9a97]">
             {t('sync.lastSynced')}: {syncedTimeLabel}
           </div>
-          {syncError && <div className="px-2 text-[10px] text-[#7a4f69] truncate">{syncError}</div>}
+          {syncError && <div className="px-2 text-[10px] text-[#7a4f69] truncate">{friendlySyncError}</div>}
           <button 
             onClick={exportData}
             className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-[#efefed] text-[#787774] w-full text-left"

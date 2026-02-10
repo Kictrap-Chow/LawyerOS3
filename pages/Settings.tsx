@@ -13,18 +13,28 @@ export const Settings: React.FC = () => {
   const [authMessage, setAuthMessage] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
 
+  const toFriendlyAuthMessage = (raw?: string) => {
+    const msg = (raw || '').toLowerCase();
+    if (msg.includes('email not confirmed')) return '邮箱尚未验证，请先到邮箱点击确认链接。';
+    if (msg.includes('invalid login credentials')) return '邮箱或密码错误，请检查后重试。';
+    if (msg.includes('user already registered')) return '该邮箱已注册，请直接登录。';
+    if (msg.includes('password should be')) return '密码强度不足，请使用更复杂的密码。';
+    if (msg.includes('network')) return '网络连接异常，请稍后重试。';
+    return raw || '操作失败，请稍后再试。';
+  };
+
   const handleSignIn = async () => {
     setAuthBusy(true);
     const res = await signIn(email.trim(), password);
     setAuthBusy(false);
-    setAuthMessage(res.ok ? '登录成功。' : (res.message || '登录失败。'));
+    setAuthMessage(res.ok ? '登录成功。' : toFriendlyAuthMessage(res.message));
   };
 
   const handleSignUp = async () => {
     setAuthBusy(true);
     const res = await signUp(email.trim(), password);
     setAuthBusy(false);
-    setAuthMessage(res.ok ? '注册成功，请返回登录。' : (res.message || '注册失败。'));
+    setAuthMessage(res.ok ? '注册成功，请返回登录。' : toFriendlyAuthMessage(res.message));
   };
 
   const handleSignOut = async () => {
@@ -44,7 +54,7 @@ export const Settings: React.FC = () => {
       <div className="craft-panel p-4 md:p-5 mb-4">
         <h2 className="text-sm font-semibold text-[#6f6377] uppercase mb-3">账号与同步</h2>
         {!isSupabaseEnabled && (
-          <div className="text-sm text-gray-500">当前未配置 Supabase 环境变量，在线同步不可用。</div>
+          <div className="text-sm text-gray-500">当前未配置云端同步环境变量，在线同步不可用。</div>
         )}
         {isSupabaseEnabled && authLoading && (
           <div className="text-sm text-gray-500">正在检查登录状态...</div>
