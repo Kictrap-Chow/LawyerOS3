@@ -539,7 +539,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
            onCancel={() => setShowPartySelector(null)}
         />
     )}
-    <div className={`${showProcedure ? 'grid grid-cols-1' : 'grid grid-cols-1 lg:grid-cols-2'} gap-4 md:gap-8 animate-fade-in pb-20`}>
+    <div className="grid grid-cols-1 gap-4 md:gap-8 animate-fade-in pb-20">
       {showInfo && (
       <div className="space-y-6 min-w-0">
         {/* Client Info */}
@@ -1069,13 +1069,15 @@ export const CaseDetail: React.FC = () => {
     <div className="h-full flex flex-col craft-surface">
       {/* Header */}
       <div className="px-3 md:px-8 py-3 md:py-5 border-b border-[#e2e8f0] sticky top-0 bg-[#f8fbff]/85 backdrop-blur-xl z-10 flex flex-col lg:flex-row justify-between lg:items-start gap-3 md:gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-2 text-sm text-slate-500">
              <span className="cursor-pointer hover:underline" onClick={() => navigate('dashboard')}>{t('breadcrumbs.dashboard')}</span> / <span>{t('breadcrumbs.cases')}</span>
           </div>
-          <h1 className="text-xl md:text-3xl font-bold text-[#1f2937] flex items-center gap-2 md:gap-3">
-            {currentCase.name}
-            <StatusBadge status={currentCase.status} />
+          <h1 className="min-w-0 text-[clamp(1.5rem,3.6vw,2.4rem)] leading-[1.15] font-bold text-[#1f2937] flex items-start gap-2 md:gap-3">
+            <span className="min-w-0 break-words">{currentCase.name}</span>
+            <span className="shrink-0 mt-1">
+              <StatusBadge status={currentCase.status} />
+            </span>
           </h1>
           <div className="text-xs md:text-sm text-slate-500 mt-1 flex gap-3 flex-wrap">
              <span>{currentCase.type}</span>
