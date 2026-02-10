@@ -14,6 +14,10 @@ export const Dashboard: React.FC = () => {
     const saved = localStorage.getItem('dashboardWidgetSize');
     return saved === 'compact' || saved === 'expanded' ? saved : 'comfort';
   });
+  const [horizontalSplit, setHorizontalSplit] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('dashboardHorizontalSplit'));
+    return Number.isFinite(saved) && saved >= 25 && saved <= 60 ? saved : 34;
+  });
 
   const activeCases = cases.filter(c => c.status !== 'archived');
   const todayStr = nowISO().split('T')[0];
@@ -35,6 +39,9 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('dashboardWidgetSize', widgetSize);
   }, [widgetSize]);
+  useEffect(() => {
+    localStorage.setItem('dashboardHorizontalSplit', String(horizontalSplit));
+  }, [horizontalSplit]);
 
   const widgetSizeConfig = {
     compact: { cardHeight: 236, deadlineLimit: 4, taskLimit: 4, taskCols: 'grid-cols-1' },
@@ -201,25 +208,43 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="mb-3 flex items-center justify-end gap-2">
-        <span className="text-xs text-gray-500">{t('dashboard.widgetSize')}</span>
-        <select
-          value={widgetSize}
-          onChange={(e) => {
-            const next = e.target.value;
-            if (next === 'compact' || next === 'comfort' || next === 'expanded') setWidgetSize(next);
-          }}
-          className="text-xs border border-[#ddd2e3] rounded px-2 py-1 bg-white outline-none"
-        >
-          <option value="compact">{t('dashboard.sizeCompact')}</option>
-          <option value="comfort">{t('dashboard.sizeComfort')}</option>
-          <option value="expanded">{t('dashboard.sizeExpanded')}</option>
-        </select>
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">{t('dashboard.widgetSize')}</span>
+          <select
+            value={widgetSize}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (next === 'compact' || next === 'comfort' || next === 'expanded') setWidgetSize(next);
+            }}
+            className="text-xs border border-[#ddd2e3] rounded px-2 py-1 bg-white outline-none"
+          >
+            <option value="compact">{t('dashboard.sizeCompact')}</option>
+            <option value="comfort">{t('dashboard.sizeComfort')}</option>
+            <option value="expanded">{t('dashboard.sizeExpanded')}</option>
+          </select>
+        </div>
+        <div className="hidden md:flex items-center gap-2 min-w-[210px]">
+          <span className="text-xs text-gray-500 whitespace-nowrap">{t('dashboard.horizontalRatio')}</span>
+          <input
+            type="range"
+            min={25}
+            max={60}
+            step={1}
+            value={horizontalSplit}
+            onChange={(e) => setHorizontalSplit(Number(e.target.value))}
+            className="w-28"
+          />
+          <span className="text-xs text-gray-500 w-10 text-right">{horizontalSplit}%</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6 mb-6 md:mb-8">
         {/* Deadlines Widget */}
-        <div className="craft-surface p-4 col-span-1 md:resize-y overflow-auto min-h-[220px]" style={{ height: `${sizeCfg.cardHeight}px` }}>
+        <div
+          className="craft-surface p-4 md:resize-y overflow-auto min-h-[220px]"
+          style={{ height: `${sizeCfg.cardHeight}px`, width: `min(100%, clamp(280px, ${horizontalSplit}%, 62%))` }}
+        >
           <div className="flex items-center gap-2 mb-4 accent-text-2 font-medium">
             <AlertCircle size={18} />
             <span>{t('dashboard.upcomingDeadlines')}</span>
@@ -238,7 +263,10 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Tasks Widget */}
-        <div className="craft-surface p-4 col-span-1 md:col-span-2 md:resize-y overflow-auto min-h-[220px]" style={{ height: `${sizeCfg.cardHeight}px` }}>
+        <div
+          className="craft-surface p-4 md:resize-y overflow-auto min-h-[220px] md:flex-1"
+          style={{ height: `${sizeCfg.cardHeight}px` }}
+        >
           <div className="flex items-center gap-2 mb-4 accent-text font-medium">
             <CheckSquare size={18} />
             <span>{t('dashboard.recentTasks')}</span>

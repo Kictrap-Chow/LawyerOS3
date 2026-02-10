@@ -143,7 +143,8 @@ const dictionaries: Record<Lang, Record<string, string>> = {
     'dashboard.sizeComfort': 'Comfort',
     'dashboard.sizeExpanded': 'Expanded',
     'dashboard.todayWork': "Today's Effective Time",
-    'dashboard.totalWork': 'Total Work Time'
+    'dashboard.totalWork': 'Total Work Time',
+    'dashboard.horizontalRatio': 'Horizontal Split'
   },
   zh: {
     'nav.search': '搜索',
@@ -279,7 +280,8 @@ const dictionaries: Record<Lang, Record<string, string>> = {
     'dashboard.sizeComfort': '标准',
     'dashboard.sizeExpanded': '宽松',
     'dashboard.todayWork': '当日有效工作计时',
-    'dashboard.totalWork': '累计工作计时'
+    'dashboard.totalWork': '累计工作计时',
+    'dashboard.horizontalRatio': '横向比例'
   }
 };
 
