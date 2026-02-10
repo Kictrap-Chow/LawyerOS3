@@ -365,10 +365,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
   );
 };
 
-const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c: Case, editing: boolean, onDraftUpdate: (c: Case) => void, onCommitUpdate: (c: Case) => void, allParties: Party[] }) => {
+const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMode = 'info' }: { c: Case, editing: boolean, onDraftUpdate: (c: Case) => void, onCommitUpdate: (c: Case) => void, allParties: Party[], viewMode?: 'info' | 'procedure' }) => {
   const [showPartySelector, setShowPartySelector] = useState<'client' | 'opponent' | null>(null);
   const { addParty, updateParty, parties } = useData();
   const { t } = useI18n();
+  const showInfo = viewMode === 'info';
+  const showProcedure = viewMode === 'procedure';
+  const showSpecialProject = c.type === '专项法律服务' || c.type === '常年法律顾问';
 
   const handlePartyUpdate = (isClient: boolean, id: string, field: keyof Party, value: string) => {
     const list = isClient ? c.clients : c.opponents;
@@ -536,7 +539,8 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
            onCancel={() => setShowPartySelector(null)}
         />
     )}
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 animate-fade-in pb-20">
+    <div className={`${showProcedure ? 'grid grid-cols-1' : 'grid grid-cols-1 lg:grid-cols-2'} gap-4 md:gap-8 animate-fade-in pb-20`}>
+      {showInfo && (
       <div className="space-y-6 min-w-0">
         {/* Client Info */}
         <div className="craft-panel p-4 shadow-sm group">
@@ -565,7 +569,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
                     disabled={!editing}
                   />
                </div>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+               <div className="grid grid-cols-1 gap-2 mb-2">
                  <input 
                     className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8] min-w-0"
                     placeholder={t('info.idCode')}
@@ -643,7 +647,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
                     disabled={!editing}
                   />
                </div>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+               <div className="grid grid-cols-1 gap-2 mb-2">
                  <input 
                     className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8] min-w-0"
                     placeholder={t('info.idCode')}
@@ -671,10 +675,12 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
           {c.opponents.length === 0 && <div className="text-sm text-gray-400 italic py-2 text-center">{t('detail.noOpponents')}</div>}
         </div>
       </div>
+      )}
 
+      {(showProcedure || (showInfo && showSpecialProject)) && (
       <div className="space-y-6 min-w-0">
          {/* Proceedings */}
-         {(c.type === '诉讼' || c.type === '仲裁') && (
+         {showProcedure && (c.type === '诉讼' || c.type === '仲裁') && (
            <div className="craft-panel p-4 shadow-sm">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-bold text-[#6f6377] uppercase">{t('proceedings.title')}</h3>
@@ -802,7 +808,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
            </div>
          )}
 
-         {c.type === '诉讼' && (
+         {showProcedure && c.type === '诉讼' && (
            <div className="craft-panel p-4 shadow-sm">
              <div className="flex justify-between items-center mb-3">
                <h3 className="text-xs font-bold text-[#6f6377] uppercase">{t('preservation.title')}</h3>
@@ -886,7 +892,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
          )}
          
          {/* Special Project Scope */}
-         {(c.type === '专项法律服务' || c.type === '常年法律顾问') && (
+         {showInfo && showSpecialProject && (
            <div className="craft-panel p-4 shadow-sm">
               <h3 className="text-xs font-bold text-[#6f6377] uppercase mb-3">{t('detail.projectScope')}</h3>
               <textarea 
@@ -898,6 +904,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
            </div>
          )}
       </div>
+      )}
     </div>
     </>
   );
@@ -908,7 +915,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
 export const CaseDetail: React.FC = () => {
   const { cases, activeCaseId, activeCaseTab, updateCase, deleteCase, navigate, parties } = useData();
   const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'procedure' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'>('info');
   const currentCase = cases.find(c => c.id === activeCaseId);
   const [isEditing, setIsEditing] = useState(false);
   const [draftCase, setDraftCase] = useState<Case | null>(null);
@@ -1099,7 +1106,7 @@ export const CaseDetail: React.FC = () => {
 
       {/* Tabs */}
       <div className="px-3 md:px-8 py-2.5 border-b border-[#e2e8f0] flex gap-2 text-sm overflow-x-auto scrollbar-hide snap-x snap-mandatory">
-        {['info', 'tasks', 'schedule', 'deadlines', 'logs', 'trash'].map(tab => (
+        {['info', 'procedure', 'tasks', 'schedule', 'deadlines', 'logs', 'trash'].map(tab => (
           <div 
             key={tab}
             onClick={() => setActiveTab(tab as any)}
@@ -1120,7 +1127,19 @@ export const CaseDetail: React.FC = () => {
               editing={isEditing} 
               onDraftUpdate={(c) => setDraftCase(c)} 
               onCommitUpdate={(c) => { setDraftCase(c); updateCase(c); }} 
-              allParties={parties} 
+              allParties={parties}
+              viewMode="info"
+            />
+          )}
+
+          {activeTab === 'procedure' && draftCase && (
+            <InfoTab
+              c={draftCase}
+              editing={isEditing}
+              onDraftUpdate={(c) => setDraftCase(c)}
+              onCommitUpdate={(c) => { setDraftCase(c); updateCase(c); }}
+              allParties={parties}
+              viewMode="procedure"
             />
           )}
 

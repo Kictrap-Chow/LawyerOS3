@@ -6,10 +6,14 @@ import { Calendar as CalendarIcon, Clock, CheckSquare, AlertCircle, ArrowRight, 
 
 export const Dashboard: React.FC = () => {
   const { cases, navigate } = useData();
-  const { lang } = useI18n();
+  const { lang, t } = useI18n();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
+  const [widgetSize, setWidgetSize] = useState<'compact' | 'comfort' | 'expanded'>(() => {
+    const saved = localStorage.getItem('dashboardWidgetSize');
+    return saved === 'compact' || saved === 'expanded' ? saved : 'comfort';
+  });
 
   const activeCases = cases.filter(c => c.status !== 'archived');
   const todayStr = nowISO().split('T')[0];
@@ -18,6 +22,9 @@ export const Dashboard: React.FC = () => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
+  useEffect(() => {
+    localStorage.setItem('dashboardWidgetSize', widgetSize);
+  }, [widgetSize]);
 
   const quotePool = useMemo(() => {
     if (lang === 'zh') {
@@ -109,7 +116,7 @@ export const Dashboard: React.FC = () => {
             {dayEvents.includes('dl') && <div className="h-1.5 w-1.5 rounded-full accent-bg mx-auto mb-1" />}
             {dayEvents.includes('rem') && <div className="h-1.5 w-1.5 rounded-full accent-bg mx-auto" />}
             {(dayEvents.length > 0) && <div className="hidden group-hover:block absolute top-8 left-0 z-10 bg-white shadow-xl border p-2 rounded text-xs w-32">
-                Click to view events
+                {t('dashboard.clickToViewEvents')}
             </div>}
           </div>
         </div>
@@ -122,6 +129,13 @@ export const Dashboard: React.FC = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + delta, 1));
   };
 
+  const taskGridCols =
+    widgetSize === 'compact'
+      ? 'grid-cols-1'
+      : widgetSize === 'expanded'
+      ? 'grid-cols-1 xl:grid-cols-3'
+      : 'grid-cols-1 sm:grid-cols-2';
+
   return (
     <div className="max-w-6xl mx-auto p-2.5 md:p-6 pb-24 md:pb-6 animate-fade-in">
       <div className="mb-6 md:mb-8 craft-surface p-4 md:p-6">
@@ -130,15 +144,31 @@ export const Dashboard: React.FC = () => {
         <p className="text-[#9b9a97] text-sm">{todayStr}</p>
       </div>
 
+      <div className="mb-3 flex items-center justify-end gap-2">
+        <span className="text-xs text-gray-500">{t('dashboard.widgetSize')}</span>
+        <select
+          value={widgetSize}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next === 'compact' || next === 'comfort' || next === 'expanded') setWidgetSize(next);
+          }}
+          className="text-xs border border-[#ddd2e3] rounded px-2 py-1 bg-white outline-none"
+        >
+          <option value="compact">{t('dashboard.sizeCompact')}</option>
+          <option value="comfort">{t('dashboard.sizeComfort')}</option>
+          <option value="expanded">{t('dashboard.sizeExpanded')}</option>
+        </select>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
         {/* Deadlines Widget */}
         <div className="craft-surface p-4 col-span-1">
           <div className="flex items-center gap-2 mb-4 accent-text-2 font-medium">
             <AlertCircle size={18} />
-            <span>Upcoming Deadlines</span>
+            <span>{t('dashboard.upcomingDeadlines')}</span>
           </div>
           <div className="space-y-2">
-            {deadlines.length === 0 ? <p className="text-sm text-gray-400 italic">No urgent deadlines.</p> : deadlines.map(d => (
+            {deadlines.length === 0 ? <p className="text-sm text-gray-400 italic">{t('dashboard.noUrgentDeadlines')}</p> : deadlines.map(d => (
               <div key={d.id} onClick={() => navigate('case', d.caseId, 'deadlines')} className="p-2 rounded bg-[#f8eeef] border border-[#e7d2d8] cursor-pointer hover:bg-[#f2e4e9] transition-colors">
                 <div className="text-sm font-medium text-gray-800">{d.title}</div>
                 <div className="flex justify-between text-xs text-[#7a4f69] mt-1">
@@ -154,10 +184,10 @@ export const Dashboard: React.FC = () => {
         <div className="craft-surface p-4 col-span-1 md:col-span-2">
           <div className="flex items-center gap-2 mb-4 accent-text font-medium">
             <CheckSquare size={18} />
-            <span>Recent Tasks</span>
+            <span>{t('dashboard.recentTasks')}</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-             {tasks.length === 0 ? <p className="text-sm text-gray-400 italic col-span-2">No pending tasks.</p> : tasks.map(t => (
+          <div className={`grid ${taskGridCols} gap-3`}>
+             {tasks.length === 0 ? <p className="text-sm text-gray-400 italic col-span-2">{t('dashboard.noPendingTasks')}</p> : tasks.map(t => (
                <div key={t.id} onClick={() => navigate('case', t.caseId, 'tasks')} className="flex flex-col p-3 rounded-md border border-[#e9e9e7] hover:bg-gray-50 cursor-pointer group">
                   <div className="flex items-start justify-between">
                     <span className="text-sm font-medium text-gray-800 line-clamp-1">{t.desc}</span>
@@ -176,10 +206,10 @@ export const Dashboard: React.FC = () => {
       {/* Reminders List */}
       <div className="mb-6 md:mb-8 craft-surface p-4">
         <h3 className="text-sm font-semibold text-gray-600 uppercase mb-4 flex items-center gap-2">
-           <Clock size={16} /> Schedule
+           <Clock size={16} /> {t('dashboard.schedule')}
         </h3>
         <div className="space-y-2">
-          {reminders.length === 0 ? <p className="text-sm text-gray-400 italic">No scheduled events.</p> : reminders.map(r => (
+          {reminders.length === 0 ? <p className="text-sm text-gray-400 italic">{t('dashboard.noScheduledEvents')}</p> : reminders.map(r => (
             <div key={r.id} onClick={() => navigate('case', r.caseId, 'schedule')} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-50 last:border-0">
                <div className="w-16 md:w-24 text-[11px] md:text-xs font-mono text-[#6b5a8b] text-center border-r border-gray-100 pr-2 mr-3">
                  <div className="font-bold">{r.date.slice(5)}</div>
@@ -228,7 +258,7 @@ export const Dashboard: React.FC = () => {
                  // @ts-ignore
                  const allEvents = [...dayDeadlines, ...dayReminders];
 
-                 if (allEvents.length === 0) return <p className="text-gray-400 text-center italic py-4">No events for this day.</p>;
+                 if (allEvents.length === 0) return <p className="text-gray-400 text-center italic py-4">{t('dashboard.noEventsForDay')}</p>;
 
                  return (
                    <div className="space-y-3">

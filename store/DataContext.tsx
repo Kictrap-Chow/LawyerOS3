@@ -29,11 +29,11 @@ interface DataContextType {
   signOut: () => Promise<void>;
   activeView: 'dashboard' | 'parties' | 'archives' | 'case' | 'settings';
   activeCaseId: string | null;
-  activeCaseTab: 'info' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash';
+  activeCaseTab: 'info' | 'procedure' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash';
   navigate: (
     view: 'dashboard' | 'parties' | 'archives' | 'case' | 'settings',
     caseId?: string | null,
-    caseTab?: 'info' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'
+    caseTab?: 'info' | 'procedure' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'
   ) => void;
 }
 
@@ -89,12 +89,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [activeView, setActiveView] = useState<'dashboard' | 'parties' | 'archives' | 'case' | 'settings'>('dashboard');
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
-  const [activeCaseTab, setActiveCaseTab] = useState<'info' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'>('info');
+  const [activeCaseTab, setActiveCaseTab] = useState<'info' | 'procedure' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'>('info');
 
   const navigate = (
     view: 'dashboard' | 'parties' | 'archives' | 'case' | 'settings',
     caseId: string | null = null,
-    caseTab: 'info' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash' = 'info'
+    caseTab: 'info' | 'procedure' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash' = 'info'
   ) => {
     setActiveView(view);
     setActiveCaseId(caseId);

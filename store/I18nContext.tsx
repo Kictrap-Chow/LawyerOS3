@@ -49,6 +49,7 @@ const dictionaries: Record<Lang, Record<string, string>> = {
     'actions.deleteCase': 'Delete',
 
     'tabs.info': 'Info',
+    'tabs.procedure': 'Procedure',
     'tabs.tasks': 'Tasks',
     'tabs.schedule': 'Schedule',
     'tabs.deadlines': 'Deadlines',
@@ -128,7 +129,19 @@ const dictionaries: Record<Lang, Record<string, string>> = {
     'detail.noClients': 'No clients added.',
     'detail.noOpponents': 'No opponents added.',
     'detail.projectScope': 'Project Scope',
-    'detail.caseNotFound': 'Case not found.'
+    'detail.caseNotFound': 'Case not found.',
+    'dashboard.upcomingDeadlines': 'Upcoming Deadlines',
+    'dashboard.recentTasks': 'Recent Tasks',
+    'dashboard.noUrgentDeadlines': 'No urgent deadlines.',
+    'dashboard.noPendingTasks': 'No pending tasks.',
+    'dashboard.schedule': 'Schedule',
+    'dashboard.noScheduledEvents': 'No scheduled events.',
+    'dashboard.clickToViewEvents': 'Click to view events',
+    'dashboard.noEventsForDay': 'No events for this day.',
+    'dashboard.widgetSize': 'Card Size',
+    'dashboard.sizeCompact': 'Compact',
+    'dashboard.sizeComfort': 'Comfort',
+    'dashboard.sizeExpanded': 'Expanded'
   },
   zh: {
     'nav.search': '搜索',
@@ -170,6 +183,7 @@ const dictionaries: Record<Lang, Record<string, string>> = {
     'actions.deleteCase': '删除',
 
     'tabs.info': '信息',
+    'tabs.procedure': '程序',
     'tabs.tasks': '任务',
     'tabs.schedule': '日程',
     'tabs.deadlines': '期限',
@@ -249,7 +263,19 @@ const dictionaries: Record<Lang, Record<string, string>> = {
     'detail.noClients': '暂无客户。',
     'detail.noOpponents': '暂无对手方。',
     'detail.projectScope': '项目范围',
-    'detail.caseNotFound': '未找到案件。'
+    'detail.caseNotFound': '未找到案件。',
+    'dashboard.upcomingDeadlines': '近期期限',
+    'dashboard.recentTasks': '近期任务',
+    'dashboard.noUrgentDeadlines': '暂无紧急期限。',
+    'dashboard.noPendingTasks': '暂无待办任务。',
+    'dashboard.schedule': '日程',
+    'dashboard.noScheduledEvents': '暂无日程事件。',
+    'dashboard.clickToViewEvents': '点击查看事件',
+    'dashboard.noEventsForDay': '当天暂无事件。',
+    'dashboard.widgetSize': '卡片大小',
+    'dashboard.sizeCompact': '紧凑',
+    'dashboard.sizeComfort': '标准',
+    'dashboard.sizeExpanded': '宽松'
   }
 };
 
