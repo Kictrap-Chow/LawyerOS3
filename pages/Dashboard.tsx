@@ -1,15 +1,51 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useData } from '../store/DataContext';
+import { useI18n } from '../store/I18nContext';
 import { nowISO } from '../utils';
 import { Calendar as CalendarIcon, Clock, CheckSquare, AlertCircle, ArrowRight, X } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   const { cases, navigate } = useData();
+  const { lang } = useI18n();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [now, setNow] = useState(new Date());
 
   const activeCases = cases.filter(c => c.status !== 'archived');
   const todayStr = nowISO().split('T')[0];
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const quotePool = useMemo(() => {
+    if (lang === 'zh') {
+      return [
+        '法不阿贵，绳不挠曲。',
+        '徒法不足以自行。',
+        '法者，治之端也。',
+        '法与时转则治，治与世宜则有功。',
+        '公平正义，比太阳更有光辉。',
+        '法律之内，应有天理人情。'
+      ];
+    }
+    return [
+      'Justice delayed is justice denied.',
+      'Let right be done.',
+      'The law should serve people, not burden them.',
+      'Where law ends, tyranny begins.',
+      'Fairness is the first duty of law.',
+      'Law gains force when it keeps pace with time.'
+    ];
+  }, [lang]);
+
+  const dayIndex = Math.floor(new Date(todayStr).getTime() / 86_400_000);
+  const quote = quotePool[Math.abs(dayIndex) % quotePool.length];
+  const hour = now.getHours();
+  const greeting = lang === 'zh'
+    ? (hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好')
+    : (hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening');
 
   // Logic for widgets
   const deadlines = activeCases
@@ -89,8 +125,9 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto p-2.5 md:p-6 pb-24 md:pb-6 animate-fade-in">
       <div className="mb-6 md:mb-8 craft-surface p-4 md:p-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-strong-theme mb-2">Good morning</h1>
-        <p className="text-[#787774]">Here is your overview for {todayStr}</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-strong-theme mb-2">{greeting}</h1>
+        <p className="text-[#787774] mb-1">{quote}</p>
+        <p className="text-[#9b9a97] text-sm">{todayStr}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">

@@ -61,24 +61,36 @@ export const Settings: React.FC = () => {
         )}
         {isSupabaseEnabled && !authLoading && !isAuthenticated && (
           <div className="space-y-2">
-            <input
-              type="email"
-              placeholder="邮箱"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full text-sm bg-white border border-[#ddd2e3] rounded px-3 py-2 outline-none"
-            />
-            <input
-              type="password"
-              placeholder="密码"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full text-sm bg-white border border-[#ddd2e3] rounded px-3 py-2 outline-none"
-            />
-            <div className="flex gap-2">
-              <button disabled={authBusy} onClick={handleSignIn} className="accent-bg accent-bg-hover text-white px-3 py-1.5 rounded text-sm disabled:opacity-60">登录</button>
-              <button disabled={authBusy} onClick={handleSignUp} className="px-3 py-1.5 rounded text-sm border border-[#ddd2e3] hover:bg-white disabled:opacity-60">注册</button>
-            </div>
+            <form
+              className="space-y-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSignIn();
+              }}
+            >
+              <input
+                type="email"
+                name="email"
+                autoComplete="email"
+                placeholder="邮箱"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full text-sm bg-white border border-[#ddd2e3] rounded px-3 py-2 outline-none"
+              />
+              <input
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                placeholder="密码"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full text-sm bg-white border border-[#ddd2e3] rounded px-3 py-2 outline-none"
+              />
+              <div className="flex gap-2">
+                <button type="submit" disabled={authBusy} className="accent-bg accent-bg-hover text-white px-3 py-1.5 rounded text-sm disabled:opacity-60">登录</button>
+                <button type="button" disabled={authBusy} onClick={handleSignUp} className="px-3 py-1.5 rounded text-sm border border-[#ddd2e3] hover:bg-white disabled:opacity-60">注册</button>
+              </div>
+            </form>
             {authMessage && <div className="text-xs text-gray-500">{authMessage}</div>}
           </div>
         )}
