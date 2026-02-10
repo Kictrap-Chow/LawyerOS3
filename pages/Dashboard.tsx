@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useData } from '../store/DataContext';
 import { useI18n } from '../store/I18nContext';
-import { nowISO } from '../utils';
+import { calculateTaskDuration, formatTimeDuration, nowISO } from '../utils';
 import { Calendar as CalendarIcon, Clock, CheckSquare, AlertCircle, ArrowRight, X } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
@@ -17,6 +17,16 @@ export const Dashboard: React.FC = () => {
 
   const activeCases = cases.filter(c => c.status !== 'archived');
   const todayStr = nowISO().split('T')[0];
+  const todayStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, [todayStr]);
+  const todayEnd = useMemo(() => {
+    const d = new Date(todayStart);
+    d.setDate(d.getDate() + 1);
+    return d.getTime();
+  }, [todayStart]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
@@ -25,6 +35,48 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('dashboardWidgetSize', widgetSize);
   }, [widgetSize]);
+
+  const widgetSizeConfig = {
+    compact: { cardHeight: 236, deadlineLimit: 4, taskLimit: 4, taskCols: 'grid-cols-1' },
+    comfort: { cardHeight: 308, deadlineLimit: 6, taskLimit: 8, taskCols: 'grid-cols-1 sm:grid-cols-2' },
+    expanded: { cardHeight: 392, deadlineLimit: 9, taskLimit: 12, taskCols: 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3' },
+  } as const;
+  const sizeCfg = widgetSizeConfig[widgetSize];
+
+  const sessionSecondsInToday = (startIso: string, endIso: string | null) => {
+    const start = new Date(startIso).getTime();
+    const endRaw = endIso ? new Date(endIso).getTime() : Date.now();
+    if (Number.isNaN(start) || Number.isNaN(endRaw)) return 0;
+    const overlapStart = Math.max(start, todayStart);
+    const overlapEnd = Math.min(endRaw, todayEnd);
+    return overlapEnd > overlapStart ? Math.floor((overlapEnd - overlapStart) / 1000) : 0;
+  };
+
+  const totalWorkSeconds = useMemo(
+    () =>
+      activeCases.reduce(
+        (sum, c) => sum + (c.tasks || []).reduce((tSum, t) => tSum + calculateTaskDuration(t), 0),
+        0
+      ),
+    [activeCases, now]
+  );
+
+  const todayWorkSeconds = useMemo(
+    () =>
+      activeCases.reduce(
+        (sum, c) =>
+          sum +
+          (c.tasks || []).reduce((tSum, t) => {
+            const daySeconds = (t.sessions || []).reduce(
+              (sSum, s) => sSum + sessionSecondsInToday(s.start, s.end),
+              0
+            );
+            return tSum + daySeconds;
+          }, 0),
+        0
+      ),
+    [activeCases, todayStart, todayEnd, now]
+  );
 
   const quotePool = useMemo(() => {
     if (lang === 'zh') {
@@ -59,13 +111,13 @@ export const Dashboard: React.FC = () => {
     .flatMap(c => (c.deadlines || []).map(d => ({ ...d, caseName: c.name, caseId: c.id })))
     .filter(d => !d.completed && d.date >= todayStr)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 5);
+    .slice(0, sizeCfg.deadlineLimit);
 
   const tasks = activeCases
     .flatMap(c => (c.tasks || []).map(t => ({ ...t, caseName: c.name, caseId: c.id })))
     .filter(t => !t.isCompleted)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 8);
+    .slice(0, sizeCfg.taskLimit);
 
   const reminders = activeCases
     .flatMap(c => (c.reminders || []).map(r => ({ ...r, caseName: c.name, caseId: c.id })))
@@ -129,12 +181,7 @@ export const Dashboard: React.FC = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + delta, 1));
   };
 
-  const taskGridCols =
-    widgetSize === 'compact'
-      ? 'grid-cols-1'
-      : widgetSize === 'expanded'
-      ? 'grid-cols-1 xl:grid-cols-3'
-      : 'grid-cols-1 sm:grid-cols-2';
+  const taskGridCols = sizeCfg.taskCols;
 
   return (
     <div className="max-w-6xl mx-auto p-2.5 md:p-6 pb-24 md:pb-6 animate-fade-in">
@@ -142,6 +189,16 @@ export const Dashboard: React.FC = () => {
         <h1 className="text-2xl md:text-3xl font-bold text-strong-theme mb-2">{greeting}</h1>
         <p className="text-[#787774] mb-1">{quote}</p>
         <p className="text-[#9b9a97] text-sm">{todayStr}</p>
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="rounded-xl border border-[#dce6f2] bg-white/80 px-3 py-2">
+            <div className="text-[11px] text-[#72819a]">{t('dashboard.todayWork')}</div>
+            <div className="text-base font-semibold text-[#30425d] mt-0.5">{formatTimeDuration(todayWorkSeconds)}</div>
+          </div>
+          <div className="rounded-xl border border-[#dce6f2] bg-white/80 px-3 py-2">
+            <div className="text-[11px] text-[#72819a]">{t('dashboard.totalWork')}</div>
+            <div className="text-base font-semibold text-[#30425d] mt-0.5">{formatTimeDuration(totalWorkSeconds)}</div>
+          </div>
+        </div>
       </div>
 
       <div className="mb-3 flex items-center justify-end gap-2">
@@ -162,7 +219,7 @@ export const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
         {/* Deadlines Widget */}
-        <div className="craft-surface p-4 col-span-1">
+        <div className="craft-surface p-4 col-span-1 md:resize-y overflow-auto min-h-[220px]" style={{ height: `${sizeCfg.cardHeight}px` }}>
           <div className="flex items-center gap-2 mb-4 accent-text-2 font-medium">
             <AlertCircle size={18} />
             <span>{t('dashboard.upcomingDeadlines')}</span>
@@ -181,7 +238,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Tasks Widget */}
-        <div className="craft-surface p-4 col-span-1 md:col-span-2">
+        <div className="craft-surface p-4 col-span-1 md:col-span-2 md:resize-y overflow-auto min-h-[220px]" style={{ height: `${sizeCfg.cardHeight}px` }}>
           <div className="flex items-center gap-2 mb-4 accent-text font-medium">
             <CheckSquare size={18} />
             <span>{t('dashboard.recentTasks')}</span>

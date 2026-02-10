@@ -141,7 +141,9 @@ const dictionaries: Record<Lang, Record<string, string>> = {
     'dashboard.widgetSize': 'Card Size',
     'dashboard.sizeCompact': 'Compact',
     'dashboard.sizeComfort': 'Comfort',
-    'dashboard.sizeExpanded': 'Expanded'
+    'dashboard.sizeExpanded': 'Expanded',
+    'dashboard.todayWork': "Today's Effective Time",
+    'dashboard.totalWork': 'Total Work Time'
   },
   zh: {
     'nav.search': '搜索',
@@ -275,7 +277,9 @@ const dictionaries: Record<Lang, Record<string, string>> = {
     'dashboard.widgetSize': '卡片大小',
     'dashboard.sizeCompact': '紧凑',
     'dashboard.sizeComfort': '标准',
-    'dashboard.sizeExpanded': '宽松'
+    'dashboard.sizeExpanded': '宽松',
+    'dashboard.todayWork': '当日有效工作计时',
+    'dashboard.totalWork': '累计工作计时'
   }
 };
 
