@@ -1,14 +1,19 @@
 create table if not exists public.cases (
   id text primary key,
+  owner_id uuid references auth.users(id) on delete cascade,
   data jsonb not null,
   updated_at timestamptz not null default now()
 );
 
 create table if not exists public.parties (
   id text primary key,
+  owner_id uuid references auth.users(id) on delete cascade,
   data jsonb not null,
   updated_at timestamptz not null default now()
 );
+
+alter table public.cases add column if not exists owner_id uuid references auth.users(id) on delete cascade;
+alter table public.parties add column if not exists owner_id uuid references auth.users(id) on delete cascade;
 
 create or replace function public.touch_updated_at()
 returns trigger
@@ -36,15 +41,20 @@ alter table public.cases enable row level security;
 alter table public.parties enable row level security;
 
 drop policy if exists "allow all anon cases" on public.cases;
-create policy "allow all anon cases"
+drop policy if exists "allow all anon parties" on public.parties;
+drop policy if exists "users manage own cases" on public.cases;
+drop policy if exists "users manage own parties" on public.parties;
+
+create policy "users manage own cases"
 on public.cases
 for all
-using (true)
-with check (true);
+to authenticated
+using (owner_id = auth.uid())
+with check (owner_id = auth.uid());
 
-drop policy if exists "allow all anon parties" on public.parties;
-create policy "allow all anon parties"
+create policy "users manage own parties"
 on public.parties
 for all
-using (true)
-with check (true);
+to authenticated
+using (owner_id = auth.uid())
+with check (owner_id = auth.uid());

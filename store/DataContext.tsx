@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { Case, Party } from '../types';
 import { nowISO } from '../utils';
 import { isSupabaseConfigured, supabase } from './supabase';
+import { User } from '@supabase/supabase-js';
 
 interface DataContextType {
   cases: Case[];
@@ -20,6 +21,12 @@ interface DataContextType {
   syncError: string | null;
   lastSyncedAt: string | null;
   isSupabaseEnabled: boolean;
+  authLoading: boolean;
+  isAuthenticated: boolean;
+  userEmail: string | null;
+  signIn: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
+  signUp: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
+  signOut: () => Promise<void>;
   activeView: 'dashboard' | 'parties' | 'archives' | 'case' | 'settings';
   activeCaseId: string | null;
   activeCaseTab: 'info' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash';
@@ -73,6 +80,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [isBootstrapped, setIsBootstrapped] = useState(false);
+  const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
+  const [authUser, setAuthUser] = useState<User | null>(null);
 
   const skipNextSyncRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
@@ -104,13 +113,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setParties(nextParties);
   };
 
-  const loadFromSupabase = useCallback(async () => {
-    if (!supabase) return false;
+  const loadFromSupabase = useCallback(async (ownerId: string) => {
+    if (!supabase || !ownerId) return false;
     try {
       setSyncStatus('syncing');
       const [casesRes, partiesRes] = await Promise.all([
-        supabase.from('cases').select('id,data').order('updated_at', { ascending: false }),
-        supabase.from('parties').select('id,data').order('updated_at', { ascending: false }),
+        supabase.from('cases').select('id,data').eq('owner_id', ownerId).order('updated_at', { ascending: false }),
+        supabase.from('parties').select('id,data').eq('owner_id', ownerId).order('updated_at', { ascending: false }),
       ]);
 
       if (casesRes.error) throw casesRes.error;
@@ -155,12 +164,45 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) {
+      setAuthLoading(false);
+      return;
+    }
+
+    let mounted = true;
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+      setAuthUser(data.session?.user ?? null);
+      setAuthLoading(false);
+    };
+    void init();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+    });
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
     const bootstrap = async () => {
       const savedTitle = localStorage.getItem(APP_KEY_TITLE);
       if (savedTitle) setAppTitleState(savedTitle);
 
       if (isSupabaseConfigured && supabase) {
-        const loaded = await loadFromSupabase();
+        if (authLoading) return;
+        if (!authUser?.id) {
+          applyDataset([], [], false);
+          setSyncStatus('offline');
+          setSyncError('Please sign in to Supabase');
+          setIsBootstrapped(true);
+          return;
+        }
+        const loaded = await loadFromSupabase(authUser.id);
         if (loaded) {
           setIsBootstrapped(true);
           return;
@@ -176,7 +218,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     void bootstrap();
-  }, [loadFromLocal, loadFromServerFile, loadFromSupabase]);
+  }, [authLoading, authUser?.id, loadFromLocal, loadFromServerFile, loadFromSupabase]);
 
   const saveToServerFile = useCallback(async (nextCases: Case[], nextParties: Party[]) => {
     try {
@@ -190,30 +232,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const syncToSupabase = useCallback(async (nextCases: Case[], nextParties: Party[]) => {
+  const syncToSupabase = useCallback(async (nextCases: Case[], nextParties: Party[], ownerId: string | null) => {
     if (!supabase || !isSupabaseConfigured) {
       await saveToServerFile(nextCases, nextParties);
       return;
     }
+    if (!ownerId) return;
 
     try {
       setSyncStatus('syncing');
 
       const { error: caseUpsertError } = await supabase.from('cases').upsert(
-        nextCases.map((item) => ({ id: item.id, data: item })),
+        nextCases.map((item) => ({ id: item.id, owner_id: ownerId, data: item })),
         { onConflict: 'id' }
       );
       if (caseUpsertError) throw caseUpsertError;
 
       const { error: partyUpsertError } = await supabase.from('parties').upsert(
-        nextParties.map((item) => ({ id: item.id, data: item })),
+        nextParties.map((item) => ({ id: item.id, owner_id: ownerId, data: item })),
         { onConflict: 'id' }
       );
       if (partyUpsertError) throw partyUpsertError;
 
       const [caseIdsRes, partyIdsRes] = await Promise.all([
-        supabase.from('cases').select('id'),
-        supabase.from('parties').select('id'),
+        supabase.from('cases').select('id').eq('owner_id', ownerId),
+        supabase.from('parties').select('id').eq('owner_id', ownerId),
       ]);
 
       if (caseIdsRes.error) throw caseIdsRes.error;
@@ -226,12 +269,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const stalePartyIds = (partyIdsRes.data || []).map((row) => row.id).filter((id) => !partyIdSet.has(id));
 
       if (staleCaseIds.length > 0) {
-        const { error } = await supabase.from('cases').delete().in('id', staleCaseIds);
+        const { error } = await supabase.from('cases').delete().eq('owner_id', ownerId).in('id', staleCaseIds);
         if (error) throw error;
       }
 
       if (stalePartyIds.length > 0) {
-        const { error } = await supabase.from('parties').delete().in('id', stalePartyIds);
+        const { error } = await supabase.from('parties').delete().eq('owner_id', ownerId).in('id', stalePartyIds);
         if (error) throw error;
       }
 
@@ -257,13 +300,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
-      void syncToSupabase(cases, parties);
+      void syncToSupabase(cases, parties, authUser?.id || null);
     }, 450);
 
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
-  }, [cases, parties, syncToSupabase, isBootstrapped]);
+  }, [cases, parties, syncToSupabase, isBootstrapped, authUser?.id]);
 
   useEffect(() => {
     localStorage.setItem(APP_KEY_TITLE, appTitle);
@@ -272,24 +315,47 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!supabase || !isSupabaseConfigured) return;
 
+    if (!authUser?.id) return;
+
     const refreshFromRemote = () => {
       if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
       reloadTimerRef.current = window.setTimeout(() => {
-        void loadFromSupabase();
+        void loadFromSupabase(authUser.id);
       }, 300);
     };
 
     const channel = supabase
       .channel('lawyeros-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cases' }, refreshFromRemote)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'parties' }, refreshFromRemote)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cases', filter: `owner_id=eq.${authUser.id}` }, refreshFromRemote)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'parties', filter: `owner_id=eq.${authUser.id}` }, refreshFromRemote)
       .subscribe();
 
     return () => {
       if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
       void supabase.removeChannel(channel);
     };
-  }, [loadFromSupabase]);
+  }, [authUser?.id, loadFromSupabase]);
+
+  const signIn = async (email: string, password: string) => {
+    if (!supabase) return { ok: false, message: 'Supabase is not configured.' };
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { ok: false, message: error.message };
+    return { ok: true };
+  };
+
+  const signUp = async (email: string, password: string) => {
+    if (!supabase) return { ok: false, message: 'Supabase is not configured.' };
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) return { ok: false, message: error.message };
+    return { ok: true };
+  };
+
+  const signOut = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setCases([]);
+    setParties([]);
+  };
 
   const setAppTitle = (title: string) => setAppTitleState(title);
 
@@ -358,6 +424,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         syncError,
         lastSyncedAt,
         isSupabaseEnabled: isSupabaseConfigured,
+        authLoading,
+        isAuthenticated: Boolean(authUser),
+        userEmail: authUser?.email || null,
+        signIn,
+        signUp,
+        signOut,
         activeView,
         activeCaseId,
         activeCaseTab,
