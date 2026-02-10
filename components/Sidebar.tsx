@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useData } from '../store/DataContext';
 import { 
   Home, Users, Archive, Plus, Search,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../utils';
 import { useI18n } from '../store/I18nContext';
+import { Case } from '../types';
 
 interface SidebarProps {
   onSearch: () => void;
@@ -16,12 +17,28 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, className, onAfterNavigate, onToggleCollapse }) => {
-  const { cases, activeView, activeCaseId, navigate, appTitle, setAppTitle, syncStatus, syncError, lastSyncedAt, isSupabaseEnabled } = useData();
+  const { cases, activeView, activeCaseId, navigate, appTitle, syncStatus, syncError, lastSyncedAt, isSupabaseEnabled } = useData();
   const { t } = useI18n();
-  const [editingTitle, setEditingTitle] = useState(false);
   const activeCases = cases
     .filter(c => c.status !== 'archived')
     .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+
+  const caseTypeToken = (c: Case) => {
+    const raw = String(c.type);
+    if (raw === '诉讼' || raw === 'Litigation') return 'litigation';
+    if (raw === '仲裁' || raw === 'Arbitration') return 'arbitration';
+    if (raw === '常年法律顾问' || raw === 'Retainer') return 'retainer';
+    if (raw === '专项法律服务' || raw === 'Advisory') return 'special';
+    if (raw === '争议解决' || raw === 'Dispute') return 'dispute';
+    return 'other';
+  };
+  const caseTypeSections: Array<{ key: string; title: string; items: Case[] }> = [
+    { key: 'litigation', title: t('case.type.litigation'), items: activeCases.filter((c) => caseTypeToken(c) === 'litigation') },
+    { key: 'arbitration', title: t('case.type.arbitration'), items: activeCases.filter((c) => caseTypeToken(c) === 'arbitration') },
+    { key: 'retainer', title: t('case.type.retainer'), items: activeCases.filter((c) => caseTypeToken(c) === 'retainer') },
+    { key: 'special', title: t('case.type.special'), items: activeCases.filter((c) => caseTypeToken(c) === 'special') },
+    { key: 'dispute', title: t('case.type.dispute'), items: activeCases.filter((c) => caseTypeToken(c) === 'dispute') },
+  ];
 
   const NavItem = ({ icon: Icon, label, active, onClick, badge }: any) => (
     <div 
@@ -69,23 +86,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
     <div className={cn("w-[292px] h-full craft-surface flex flex-col flex-shrink-0", className)}>
       {/* App Title */}
       <div className="p-3 h-14 flex items-center justify-between group border-b border-[#e3e9f3]">
-        {editingTitle ? (
-          <input 
-            autoFocus
-            className="w-full bg-white px-2 py-1 text-sm rounded border border-[#8a6d95] outline-none"
-            value={appTitle}
-            onChange={(e) => setAppTitle(e.target.value)}
-            onBlur={() => setEditingTitle(false)}
-            onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-          />
-        ) : (
-          <div 
-            onClick={() => setEditingTitle(true)}
-          className="flex items-center gap-2 px-2 py-1.5 w-full rounded-xl hover:bg-white/80 cursor-pointer text-sm font-semibold text-strong-theme truncate"
-          >
-            {appTitle}
-          </div>
-        )}
+        <div className="flex items-center gap-2 px-2 py-1.5 w-full rounded-xl text-sm font-semibold text-strong-theme truncate">
+          {appTitle}
+        </div>
         {!!onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
@@ -148,21 +151,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
         {/* Case Lists */}
         <Section title={t('nav.activeCases')}>
           <div className="craft-panel p-1.5">
-            {activeCases.map(c => (
-              <div
-                key={c.id}
-                onClick={() => {
-                  navigate('case', c.id);
-                  onAfterNavigate?.();
-                }}
-                className={cn(
-                  "flex items-center gap-2 px-2.5 py-1.5 ml-1 text-sm rounded-xl cursor-pointer transition-colors text-[#4b5563] hover:bg-white truncate",
-                  activeCaseId === c.id && "bg-white text-strong-theme font-medium shadow-sm"
-                )}
-              >
-                <Scale size={13} className="text-gray-400 shrink-0" />
-                <span className="truncate flex-1">{c.name}</span>
-                {c.updatedAt && <span className="text-[10px] text-gray-400 shrink-0">{new Date(c.updatedAt).toLocaleDateString()}</span>}
+            {caseTypeSections.map((section) => (
+              <div key={section.key} className="mb-2 last:mb-0">
+                <div className="px-2.5 py-1 text-[10px] font-semibold text-[#8f95a3] uppercase tracking-wide">{section.title}</div>
+                {section.items.map(c => (
+                  <div
+                    key={c.id}
+                    onClick={() => {
+                      navigate('case', c.id);
+                      onAfterNavigate?.();
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 px-2.5 py-1.5 ml-1 text-sm rounded-xl cursor-pointer transition-colors text-[#4b5563] hover:bg-white truncate",
+                      activeCaseId === c.id && "bg-white text-strong-theme font-medium shadow-sm"
+                    )}
+                  >
+                    <Scale size={13} className="text-gray-400 shrink-0" />
+                    <span className="truncate flex-1">{c.name}</span>
+                    {c.updatedAt && <span className="text-[10px] text-gray-400 shrink-0">{new Date(c.updatedAt).toLocaleDateString()}</span>}
+                  </div>
+                ))}
               </div>
             ))}
             {activeCases.length === 0 && (

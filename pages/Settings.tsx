@@ -8,7 +8,7 @@ import { FileJson, FileUp } from 'lucide-react';
 export const Settings: React.FC = () => {
   const { lang, setLang } = useI18n();
   const { accent, setAccent, textColor, setTextColor, font, setFont } = useTheme();
-  const { isSupabaseEnabled, authLoading, isAuthenticated, userEmail, signIn, signUp, signOut, exportData, importData } = useData();
+  const { appTitle, setAppTitle, isSupabaseEnabled, authLoading, isAuthenticated, userEmail, signIn, signUp, signOut, exportData, importData } = useData();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
@@ -65,6 +65,17 @@ export const Settings: React.FC = () => {
       <div className="craft-surface p-4 md:p-6 mb-4">
         <h1 className="text-2xl font-bold text-strong-theme">设置</h1>
         <p className="text-sm text-gray-500 mt-1">语言、强调色、文字颜色和字体都在这里调整。</p>
+      </div>
+
+      <div className="craft-panel p-4 md:p-5 mb-4">
+        <h2 className="text-sm font-semibold text-[#6f6377] uppercase mb-3">系统</h2>
+        <label className="block text-xs text-[#8a8092] mb-1">系统名称</label>
+        <input
+          className="w-full text-sm bg-white border border-[#ddd2e3] rounded px-3 py-2 outline-none"
+          value={appTitle}
+          onChange={(e) => setAppTitle(e.target.value)}
+          placeholder="请输入系统名称"
+        />
       </div>
 
       <div className="craft-panel p-4 md:p-5 mb-4">

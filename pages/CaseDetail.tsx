@@ -391,7 +391,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
 
   const removeParty = (isClient: boolean, id: string) => {
     if (!editing) {
-      alert('请点击 Edit Properties 开启编辑后再进行删除');
+      alert('请先点击“编辑”后再进行删除');
       return;
     }
     onCommitUpdate({ ...c, [isClient ? 'clients' : 'opponents']: (isClient ? c.clients : c.opponents).filter(p => p.id !== id) });
@@ -537,7 +537,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
         />
     )}
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 animate-fade-in pb-20">
-      <div className="space-y-6">
+      <div className="space-y-6 min-w-0">
         {/* Client Info */}
         <div className="craft-panel p-4 shadow-sm group">
           <div className="flex justify-between items-center mb-3">
@@ -545,11 +545,11 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
             <button onClick={() => addPartyToCase(true)} className="text-xs text-[#6b5a8b] hover:underline">{t('info.addClient')}</button>
           </div>
           {c.clients.map(p => (
-             <div key={p.id} className="mb-4 last:mb-0 pb-4 border-b border-gray-50 last:border-0 relative">
+             <div key={p.id} className="mb-4 last:mb-0 pb-4 border-b border-gray-50 last:border-0 relative min-w-0">
                <button disabled={!editing} onClick={() => removeParty(true, p.id)} className={`absolute right-0 top-0 ${editing ? 'text-gray-300 hover:text-[#7a4f69]' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>
-               <div className="flex gap-2 mb-2">
+               <div className="flex gap-2 mb-2 min-w-0 items-start">
                   <select 
-                    className="text-lg bg-transparent outline-none cursor-pointer"
+                    className="text-lg bg-transparent outline-none cursor-pointer shrink-0"
                     value={p.type}
                     onChange={(e) => handlePartyUpdate(true, p.id, 'type', e.target.value as any)}
                     disabled={!editing}
@@ -558,7 +558,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
                     <option value="individual">👤</option>
                   </select>
                   <input 
-                    className="font-medium text-[#3f2f4d] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none w-full transition-colors"
+                    className="font-medium text-[#3f2f4d] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none w-full min-w-0 transition-colors"
                     placeholder={t('info.client')}
                     value={p.name}
                     onChange={(e) => handlePartyUpdate(true, p.id, 'name', e.target.value)}
@@ -567,22 +567,22 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
                </div>
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                  <input 
-                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
+                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8] min-w-0"
                     placeholder={t('info.idCode')}
                     value={p.idCode || ''}
                     onChange={(e) => handlePartyUpdate(true, p.id, 'idCode', e.target.value)}
                     disabled={!editing}
                  />
                  <input 
-                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
+                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8] min-w-0"
                     placeholder={t('info.address')}
                     value={p.address || ''}
                     onChange={(e) => handlePartyUpdate(true, p.id, 'address', e.target.value)}
                     disabled={!editing}
                  />
                </div>
-               <input 
-                  className="w-full text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
+               <input
+                  className="w-full min-w-0 text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
                   placeholder={t('info.remarks')}
                   value={p.note || ''}
                   onChange={(e) => handlePartyUpdate(true, p.id, 'note', e.target.value)}
@@ -594,19 +594,19 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
           
           <div className="mt-4 pt-4 border-t border-[#e8dfeb] text-sm">
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-               <div>
+               <div className="min-w-0">
                   <label className="block text-xs text-[#8a8092] mb-1">{t('info.contactPerson')}</label>
                   <input 
-                    className="w-full text-[#3f2f4d] border-b border-transparent hover:border-gray-200 focus:border-[#8a6d95] outline-none bg-transparent"
+                    className="w-full min-w-0 text-[#3f2f4d] border-b border-transparent hover:border-gray-200 focus:border-[#8a6d95] outline-none bg-transparent"
                     placeholder={t('info.contactPerson')}
                     value={c.clientContactName || ''}
                     onChange={(e) => editing && onDraftUpdate({...c, clientContactName: e.target.value})}
                   />
                </div>
-               <div>
+               <div className="min-w-0">
                   <label className="block text-xs text-[#8a8092] mb-1">{t('info.contactInfo')}</label>
                   <input 
-                    className="w-full text-[#3f2f4d] border-b border-transparent hover:border-gray-200 focus:border-[#8a6d95] outline-none bg-transparent"
+                    className="w-full min-w-0 text-[#3f2f4d] border-b border-transparent hover:border-gray-200 focus:border-[#8a6d95] outline-none bg-transparent"
                     placeholder={t('info.contactInfo')}
                     value={c.clientContactInfo || ''}
                     onChange={(e) => editing && onDraftUpdate({...c, clientContactInfo: e.target.value})}
@@ -623,11 +623,11 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
             <button onClick={() => addPartyToCase(false)} className="text-xs text-[#6b5a8b] hover:underline">{t('info.addOpponent')}</button>
           </div>
           {c.opponents.map(p => (
-             <div key={p.id} className="mb-4 last:mb-0 pb-4 border-b border-gray-50 last:border-0 relative">
+             <div key={p.id} className="mb-4 last:mb-0 pb-4 border-b border-gray-50 last:border-0 relative min-w-0">
                <button disabled={!editing} onClick={() => removeParty(false, p.id)} className={`absolute right-0 top-0 ${editing ? 'text-gray-300 hover:text-[#7a4f69]' : 'text-gray-200 cursor-not-allowed'}`}><Trash2 size={14}/></button>
-               <div className="flex gap-2 mb-2">
+               <div className="flex gap-2 mb-2 min-w-0 items-start">
                   <select 
-                    className="text-lg bg-transparent outline-none cursor-pointer"
+                    className="text-lg bg-transparent outline-none cursor-pointer shrink-0"
                     value={p.type}
                     onChange={(e) => handlePartyUpdate(false, p.id, 'type', e.target.value as any)}
                     disabled={!editing}
@@ -636,7 +636,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
                     <option value="individual">👤</option>
                   </select>
                   <input 
-                    className="font-medium text-[#3f2f4d] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none w-full transition-colors"
+                    className="font-medium text-[#3f2f4d] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none w-full min-w-0 transition-colors"
                     placeholder={t('info.opponent')}
                     value={p.name}
                     onChange={(e) => handlePartyUpdate(false, p.id, 'name', e.target.value)}
@@ -645,22 +645,22 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
                </div>
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                  <input 
-                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
+                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8] min-w-0"
                     placeholder={t('info.idCode')}
                     value={p.idCode || ''}
                     onChange={(e) => handlePartyUpdate(false, p.id, 'idCode', e.target.value)}
                     disabled={!editing}
                  />
                  <input 
-                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
+                    className="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8] min-w-0"
                     placeholder={t('info.address')}
                     value={p.address || ''}
                     onChange={(e) => handlePartyUpdate(false, p.id, 'address', e.target.value)}
                     disabled={!editing}
                  />
                </div>
-               <input 
-                  className="w-full text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
+               <input
+                  className="w-full min-w-0 text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 outline-none focus:bg-white focus:ring-1 ring-[#dfcfe8]"
                   placeholder={t('info.remarks')}
                   value={p.note || ''}
                   onChange={(e) => handlePartyUpdate(false, p.id, 'note', e.target.value)}
@@ -672,7 +672,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-6 min-w-0">
          {/* Proceedings */}
          {(c.type === '诉讼' || c.type === '仲裁') && (
            <div className="craft-panel p-4 shadow-sm">
@@ -692,21 +692,21 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
               
               {c.litigation.proceedings.map((proc, idx) => (
                 <div key={proc.id} className="mb-6 last:mb-0 pb-6 border-b border-gray-100 last:border-0 relative">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2 items-end">
-                      <div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2 items-start">
+                      <div className="min-w-0">
                         <label className="block text-[10px] text-[#8a8092] mb-1">{t('proceedings.stage')}</label>
                         <input
-                          className="w-full font-semibold text-sm bg-white/90 border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
+                          className="w-full min-w-0 font-semibold text-sm bg-white/90 border border-[#ddd2e3] rounded px-2 py-1.5 outline-none focus:border-[#8a6d95]"
                           value={proc.stageName}
                           onChange={(e) => handleProcUpdate(proc.id, 'stageName', e.target.value)}
                           disabled={!editing}
                           placeholder={t('proceedings.stage')}
                         />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <label className="block text-[10px] text-[#8a8092] mb-1">{t('proceedings.myRole')}</label>
                         <input
-                           className="w-full text-sm text-[#6f6377] bg-[#f3edf5] rounded border border-[#ddd2e3] outline-none py-1.5 px-2 focus:border-[#8a6d95]"
+                           className="w-full min-w-0 text-sm text-[#6f6377] bg-[#f3edf5] rounded border border-[#ddd2e3] outline-none py-1.5 px-2 focus:border-[#8a6d95]"
                            value={proc.myRole}
                            onChange={(e) => handleProcUpdate(proc.id, 'myRole', e.target.value)}
                            placeholder={t('proceedings.myRole')}
@@ -716,9 +716,9 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
                    </div>
                    <div className="mb-3">
                      <label className="block text-[10px] text-[#8a8092] mb-1">{t('proceedings.caseNo')}</label>
-                     <div className="flex items-center gap-2 w-full">
+                     <div className="flex items-center gap-2 w-full min-w-0">
                          <input
-                           className="text-xs font-mono bg-gray-50 px-2 py-1.5 rounded border border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none w-full text-left"
+                           className="text-xs font-mono bg-gray-50 px-2 py-1.5 rounded border border-transparent hover:border-gray-300 focus:border-[#8a6d95] outline-none w-full min-w-0 text-left"
                            value={proc.caseNo}
                            onChange={(e) => handleProcUpdate(proc.id, 'caseNo', e.target.value)}
                            disabled={!editing}
@@ -733,20 +733,20 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties }: { c:
 
                    <div className="space-y-3">
                       <div className="grid grid-cols-1 gap-2">
-                        <div className="flex items-center gap-2">
-                           <span className="text-xs text-gray-400 w-16">{t('proceedings.institution')}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                           <span className="text-xs text-gray-400 w-16 shrink-0">{t('proceedings.institution')}</span>
                            <input 
-                             className="flex-1 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
+                             className="flex-1 min-w-0 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
                              value={proc.courtName}
                              onChange={(e) => handleProcUpdate(proc.id, 'courtName', e.target.value)}
                              disabled={!editing}
                              placeholder={t('proceedings.court')}
                            />
                         </div>
-                        <div className="flex items-center gap-2">
-                           <span className="text-xs text-gray-400 w-16">{t('proceedings.address')}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                           <span className="text-xs text-gray-400 w-16 shrink-0">{t('proceedings.address')}</span>
                            <input 
-                             className="flex-1 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
+                             className="flex-1 min-w-0 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[#8a6d95] outline-none py-1"
                              value={proc.courtAddress}
                              onChange={(e) => handleProcUpdate(proc.id, 'courtAddress', e.target.value)}
                              disabled={!editing}
@@ -1075,18 +1075,18 @@ export const CaseDetail: React.FC = () => {
              {currentCase.updatedAt && <span>• Updated {new Date(currentCase.updatedAt).toLocaleString()}</span>}
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
            {!isEditing ? (
-             <button onClick={() => { setIsEditing(true); setDraftCase(currentCase); }} className="px-3 py-1.5 border border-[#d9e1ed] bg-white rounded-xl text-sm hover:bg-gray-50">{t('actions.edit')}</button>
+             <button onClick={() => { setIsEditing(true); setDraftCase(currentCase); }} className="px-3 py-1.5 border border-[#d9e1ed] bg-white rounded-xl text-sm whitespace-nowrap hover:bg-gray-50">{t('actions.edit')}</button>
            ) : (
-           <button onClick={() => { if (draftCase) updateCase(draftCase); setIsEditing(false); }} className="px-3 py-1.5 border accent-border rounded-xl text-sm accent-bg accent-bg-hover text-white">{t('actions.saveChanges')}</button>
+           <button onClick={() => { if (draftCase) updateCase(draftCase); setIsEditing(false); }} className="px-3 py-1.5 border accent-border rounded-xl text-sm whitespace-nowrap accent-bg accent-bg-hover text-white">{t('actions.saveChanges')}</button>
            )}
            <button 
              onClick={() => setShowDeleteConfirm(true)}
-             className="px-3 py-1.5 border border-[#d6b8c6] text-[#7a4f69] rounded-xl text-sm hover:bg-[#f8eeef]"
+             className="px-3 py-1.5 border border-[#d6b8c6] text-[#7a4f69] rounded-xl text-sm whitespace-nowrap hover:bg-[#f8eeef]"
            >{t('actions.deleteCase')}</button>
            <select 
-             className="px-3 py-1.5 border border-[#d9e1ed] bg-white rounded-xl text-sm hover:bg-gray-50 outline-none cursor-pointer"
+             className="px-3 py-1.5 border border-[#d9e1ed] bg-white rounded-xl text-sm min-w-[112px] hover:bg-gray-50 outline-none cursor-pointer"
              value={currentCase.status}
              onChange={handleStatusChange}
            >

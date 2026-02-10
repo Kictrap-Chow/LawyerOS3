@@ -44,9 +44,9 @@ const dictionaries: Record<Lang, Record<string, string>> = {
 
     'breadcrumbs.dashboard': 'Dashboard',
     'breadcrumbs.cases': 'Cases',
-    'actions.edit': 'Edit Properties',
+    'actions.edit': 'Edit',
     'actions.saveChanges': 'Save Changes',
-    'actions.deleteCase': 'Delete Case',
+    'actions.deleteCase': 'Delete',
 
     'tabs.info': 'Info',
     'tabs.tasks': 'Tasks',
@@ -165,9 +165,9 @@ const dictionaries: Record<Lang, Record<string, string>> = {
 
     'breadcrumbs.dashboard': '仪表盘',
     'breadcrumbs.cases': '案件',
-    'actions.edit': '编辑属性',
+    'actions.edit': '编辑',
     'actions.saveChanges': '保存修改',
-    'actions.deleteCase': '删除案件',
+    'actions.deleteCase': '删除',
 
     'tabs.info': '信息',
     'tabs.tasks': '任务',
