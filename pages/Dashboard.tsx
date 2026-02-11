@@ -132,6 +132,17 @@ export const Dashboard: React.FC = () => {
     .sort((a, b) => new Date(a.date + 'T' + a.time).getTime() - new Date(b.date + 'T' + b.time).getTime())
     .slice(0, 6);
 
+  const actionReminders = activeCases
+    .flatMap(c => (c.actionReminders || []).map(r => ({ ...r, caseName: c.name, caseId: c.id })))
+    .filter(r => !r.completed)
+    .sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    })
+    .slice(0, sizeCfg.deadlineLimit);
+
   // Calendar Logic
   const generateCalendar = () => {
     const y = currentMonth.getFullYear();
@@ -282,6 +293,32 @@ export const Dashboard: React.FC = () => {
                </div>
              ))}
           </div>
+        </div>
+      </div>
+
+      <div className="mb-6 md:mb-8 craft-surface p-4">
+        <h3 className="text-sm font-semibold text-gray-600 uppercase mb-4 flex items-center gap-2">
+          <AlertCircle size={16} /> {t('dashboard.actionReminders')}
+        </h3>
+        <div className="space-y-2">
+          {actionReminders.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">{t('dashboard.noActionReminders')}</p>
+          ) : actionReminders.map((item) => (
+            <div
+              key={item.id}
+              onClick={() => navigate('case', item.caseId, 'reminders')}
+              className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-50 last:border-0"
+            >
+              <div className="w-20 md:w-28 text-[11px] md:text-xs font-mono tint-text text-center border-r border-gray-100 pr-2 mr-3">
+                <div className="font-bold">{item.dueDate ? item.dueDate.slice(5) : '--'}</div>
+                <div>{item.dueDate ? 'DUE' : 'OPEN'}</div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm tint-text truncate">{item.title}</div>
+                <div className="text-xs text-gray-400 truncate">{item.caseName}</div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
