@@ -81,7 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
     .replace('Please sign in to Supabase', '请先登录后同步');
 
   return (
-    <div className={cn("w-[292px] h-full craft-surface flex flex-col flex-shrink-0", className)}>
+    <div className={cn("w-full h-full craft-surface flex flex-col flex-shrink-0", className)}>
       {/* App Title */}
       <div className="p-3 h-14 flex items-center justify-between group border-b border-[#e3e9f3]">
         <div className="flex items-center gap-2 px-2 py-1.5 w-full rounded-xl text-sm font-semibold text-strong-theme truncate">

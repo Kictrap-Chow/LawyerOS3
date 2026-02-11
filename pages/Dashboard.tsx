@@ -5,18 +5,19 @@ import { calculateTaskDuration, formatTimeDuration, nowISO } from '../utils';
 import { Calendar as CalendarIcon, Clock, CheckSquare, AlertCircle, ArrowRight, X } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
+  type WidgetTone = 'small' | 'medium' | 'large';
   const { cases, navigate } = useData();
   const { lang, t } = useI18n();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
-  const [widgetSize, setWidgetSize] = useState<'compact' | 'comfort' | 'expanded'>(() => {
-    const saved = localStorage.getItem('dashboardWidgetSize');
-    return saved === 'compact' || saved === 'expanded' ? saved : 'comfort';
+  const [deadlineWidgetSize, setDeadlineWidgetSize] = useState<WidgetTone>(() => {
+    const saved = localStorage.getItem('dashboardDeadlineWidgetSize');
+    return saved === 'small' || saved === 'large' ? saved : 'medium';
   });
-  const [horizontalSplit, setHorizontalSplit] = useState<number>(() => {
-    const saved = Number(localStorage.getItem('dashboardHorizontalSplit'));
-    return Number.isFinite(saved) && saved >= 25 && saved <= 60 ? saved : 34;
+  const [taskWidgetSize, setTaskWidgetSize] = useState<WidgetTone>(() => {
+    const saved = localStorage.getItem('dashboardTaskWidgetSize');
+    return saved === 'small' || saved === 'large' ? saved : 'medium';
   });
 
   const activeCases = cases.filter(c => c.status !== 'archived');
@@ -37,18 +38,24 @@ export const Dashboard: React.FC = () => {
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => {
-    localStorage.setItem('dashboardWidgetSize', widgetSize);
-  }, [widgetSize]);
+    localStorage.setItem('dashboardDeadlineWidgetSize', deadlineWidgetSize);
+  }, [deadlineWidgetSize]);
   useEffect(() => {
-    localStorage.setItem('dashboardHorizontalSplit', String(horizontalSplit));
-  }, [horizontalSplit]);
+    localStorage.setItem('dashboardTaskWidgetSize', taskWidgetSize);
+  }, [taskWidgetSize]);
 
-  const widgetSizeConfig = {
-    compact: { cardHeight: 236, deadlineLimit: 4, taskLimit: 4, taskCols: 'grid-cols-1' },
-    comfort: { cardHeight: 308, deadlineLimit: 6, taskLimit: 8, taskCols: 'grid-cols-1 sm:grid-cols-2' },
-    expanded: { cardHeight: 392, deadlineLimit: 9, taskLimit: 12, taskCols: 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3' },
+  const deadlineWidgetConfig = {
+    small: { cardHeight: 230, limit: 4, colSpan: 'md:col-span-1' },
+    medium: { cardHeight: 300, limit: 6, colSpan: 'md:col-span-1' },
+    large: { cardHeight: 360, limit: 10, colSpan: 'md:col-span-2' },
   } as const;
-  const sizeCfg = widgetSizeConfig[widgetSize];
+  const taskWidgetConfig = {
+    small: { cardHeight: 230, limit: 4, cols: 'grid-cols-1', colSpan: 'md:col-span-1' },
+    medium: { cardHeight: 300, limit: 8, cols: 'grid-cols-1 sm:grid-cols-2', colSpan: 'md:col-span-1' },
+    large: { cardHeight: 380, limit: 12, cols: 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3', colSpan: 'md:col-span-2' },
+  } as const;
+  const deadlineCfg = deadlineWidgetConfig[deadlineWidgetSize];
+  const taskCfg = taskWidgetConfig[taskWidgetSize];
 
   const sessionSecondsInToday = (startIso: string, endIso: string | null) => {
     const start = new Date(startIso).getTime();
@@ -118,13 +125,13 @@ export const Dashboard: React.FC = () => {
     .flatMap(c => (c.deadlines || []).map(d => ({ ...d, caseName: c.name, caseId: c.id })))
     .filter(d => !d.completed && d.date >= todayStr)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, sizeCfg.deadlineLimit);
+    .slice(0, deadlineCfg.limit);
 
   const tasks = activeCases
     .flatMap(c => (c.tasks || []).map(t => ({ ...t, caseName: c.name, caseId: c.id })))
     .filter(t => !t.isCompleted)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, sizeCfg.taskLimit);
+    .slice(0, taskCfg.limit);
 
   const reminders = activeCases
     .flatMap(c => (c.reminders || []).map(r => ({ ...r, caseName: c.name, caseId: c.id })))
@@ -141,7 +148,7 @@ export const Dashboard: React.FC = () => {
       if (!b.dueDate) return -1;
       return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
     })
-    .slice(0, sizeCfg.deadlineLimit);
+    .slice(0, deadlineCfg.limit);
 
   // Calendar Logic
   const generateCalendar = () => {
@@ -199,7 +206,8 @@ export const Dashboard: React.FC = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + delta, 1));
   };
 
-  const taskGridCols = sizeCfg.taskCols;
+  const taskGridCols = taskCfg.cols;
+  const widgetTones: WidgetTone[] = ['small', 'medium', 'large'];
 
   return (
     <div className="max-w-6xl mx-auto p-2.5 md:p-6 pb-24 md:pb-6 animate-fade-in">
@@ -219,46 +227,29 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">{t('dashboard.widgetSize')}</span>
-          <select
-            value={widgetSize}
-            onChange={(e) => {
-              const next = e.target.value;
-              if (next === 'compact' || next === 'comfort' || next === 'expanded') setWidgetSize(next);
-            }}
-            className="text-xs border tint-border rounded px-2 py-1 bg-white outline-none"
-          >
-            <option value="compact">{t('dashboard.sizeCompact')}</option>
-            <option value="comfort">{t('dashboard.sizeComfort')}</option>
-            <option value="expanded">{t('dashboard.sizeExpanded')}</option>
-          </select>
-        </div>
-        <div className="hidden md:flex items-center gap-2 min-w-[210px]">
-          <span className="text-xs text-gray-500 whitespace-nowrap">{t('dashboard.horizontalRatio')}</span>
-          <input
-            type="range"
-            min={25}
-            max={60}
-            step={1}
-            value={horizontalSplit}
-            onChange={(e) => setHorizontalSplit(Number(e.target.value))}
-            className="w-28"
-          />
-          <span className="text-xs text-gray-500 w-10 text-right">{horizontalSplit}%</span>
-        </div>
-      </div>
+      <div className="mb-3 text-xs text-gray-500">{t('dashboard.widgetHint')}</div>
 
-      <div className="flex flex-col md:flex-row gap-4 md:gap-6 mb-6 md:mb-8">
-        {/* Deadlines Widget */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
         <div
-          className="craft-surface p-4 w-full md:[width:var(--deadline-width)] md:resize-y overflow-auto min-h-[220px]"
-          style={{ height: `${sizeCfg.cardHeight}px`, ['--deadline-width' as any]: `clamp(280px, ${horizontalSplit}%, 62%)` }}
+          className={`craft-surface p-4 overflow-auto min-h-[220px] ${deadlineCfg.colSpan}`}
+          style={{ height: `${deadlineCfg.cardHeight}px` }}
         >
-          <div className="flex items-center gap-2 mb-4 accent-text-2 font-medium">
-            <AlertCircle size={18} />
-            <span>{t('dashboard.upcomingDeadlines')}</span>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2 accent-text-2 font-medium">
+              <AlertCircle size={18} />
+              <span>{t('dashboard.upcomingDeadlines')}</span>
+            </div>
+            <div className="flex items-center gap-1 rounded-lg border tint-border bg-white/80 p-1">
+              {widgetTones.map((tone) => (
+                <button
+                  key={`dl-${tone}`}
+                  onClick={() => setDeadlineWidgetSize(tone)}
+                  className={`px-2 py-1 text-[11px] rounded ${deadlineWidgetSize === tone ? 'accent-bg text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                >
+                  {t(`dashboard.widget.${tone}`)}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="space-y-2">
             {deadlines.length === 0 ? <p className="text-sm text-gray-400 italic">{t('dashboard.noUrgentDeadlines')}</p> : deadlines.map(d => (
@@ -266,18 +257,33 @@ export const Dashboard: React.FC = () => {
                 <div className="text-sm font-medium text-gray-800">{d.title}</div>
                 <div className="flex justify-between text-xs tint-text mt-1">
                   <span>{d.date}</span>
-                  <span className="truncate max-w-[100px]">{d.caseName}</span>
+                  <span className="truncate max-w-[120px]">{d.caseName}</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Tasks Widget */}
-        <div className="craft-surface p-4 md:resize-y overflow-auto min-h-[220px] md:flex-1" style={{ height: `${sizeCfg.cardHeight}px` }}>
-          <div className="flex items-center gap-2 mb-4 accent-text font-medium">
-            <CheckSquare size={18} />
-            <span>{t('dashboard.recentTasks')}</span>
+        <div
+          className={`craft-surface p-4 overflow-auto min-h-[220px] ${taskCfg.colSpan}`}
+          style={{ height: `${taskCfg.cardHeight}px` }}
+        >
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2 accent-text font-medium">
+              <CheckSquare size={18} />
+              <span>{t('dashboard.recentTasks')}</span>
+            </div>
+            <div className="flex items-center gap-1 rounded-lg border tint-border bg-white/80 p-1">
+              {widgetTones.map((tone) => (
+                <button
+                  key={`task-${tone}`}
+                  onClick={() => setTaskWidgetSize(tone)}
+                  className={`px-2 py-1 text-[11px] rounded ${taskWidgetSize === tone ? 'accent-bg text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                >
+                  {t(`dashboard.widget.${tone}`)}
+                </button>
+              ))}
+            </div>
           </div>
           <div className={`grid ${taskGridCols} gap-3`}>
              {tasks.length === 0 ? <p className="text-sm text-gray-400 italic col-span-2">{t('dashboard.noPendingTasks')}</p> : tasks.map(t => (

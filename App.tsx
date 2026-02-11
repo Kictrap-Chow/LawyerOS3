@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DataProvider, useData } from './store/DataContext';
 import { I18nProvider } from './store/I18nContext';
 import { ThemeProvider } from './store/ThemeContext';
@@ -18,11 +18,48 @@ const MainLayout: React.FC = () => {
   const [showCaseForm, setShowCaseForm] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showDesktopNav, setShowDesktopNav] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('lawyerSidebarWidth'));
+    return Number.isFinite(saved) ? Math.min(420, Math.max(248, saved)) : 292;
+  });
   const [showMobileCases, setShowMobileCases] = useState(false);
   const [showQuickTask, setShowQuickTask] = useState(false);
   const [quickCaseId, setQuickCaseId] = useState('');
   const [quickTaskDesc, setQuickTaskDesc] = useState('');
   const [quickTaskType, setQuickTaskType] = useState<'文书' | '会议' | '咨询' | '其他'>('文书');
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('lawyerSidebarWidth', String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    const onMouseMove = (event: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const delta = event.clientX - resizeRef.current.startX;
+      const nextWidth = Math.min(420, Math.max(248, resizeRef.current.startWidth + delta));
+      setSidebarWidth(nextWidth);
+    };
+    const onMouseUp = () => {
+      if (!resizeRef.current) return;
+      resizeRef.current = null;
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  const startSidebarResize = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    resizeRef.current = { startX: event.clientX, startWidth: sidebarWidth };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  };
 
   const getHeaderTitle = () => {
     if (activeView === 'dashboard') return 'Dashboard';
@@ -84,12 +121,23 @@ const MainLayout: React.FC = () => {
   return (
     <div className="flex h-dvh w-full max-w-full text-[#1f2937] font-sans antialiased overflow-hidden overflow-x-hidden selection:bg-blue-100 selection:text-blue-900 p-1.5 md:p-3 gap-1.5 md:gap-3">
       {showDesktopNav && (
-        <Sidebar
-          className="hidden md:flex"
-          onSearch={() => setShowSearch(true)}
-          onCreateCase={() => setShowCaseForm(true)}
-          onToggleCollapse={() => setShowDesktopNav(false)}
-        />
+        <div className="hidden md:flex h-full relative shrink-0" style={{ width: `${sidebarWidth}px` }}>
+          <Sidebar
+            className="flex w-full"
+            onSearch={() => setShowSearch(true)}
+            onCreateCase={() => setShowCaseForm(true)}
+            onToggleCollapse={() => setShowDesktopNav(false)}
+          />
+          <button
+            type="button"
+            onMouseDown={startSidebarResize}
+            className="absolute top-5 -right-1.5 bottom-5 w-3 cursor-col-resize group"
+            aria-label="Resize sidebar"
+            title="Resize sidebar"
+          >
+            <span className="block mx-auto h-full w-1 rounded-full bg-transparent group-hover:bg-[#cfd8e6] group-active:bg-[#b8c3d8] transition-colors" />
+          </button>
+        </div>
       )}
 
       <main className="flex-1 h-full max-w-full overflow-y-auto overflow-x-hidden relative craft-surface p-1.5 pb-24 md:pb-3 md:p-3">
