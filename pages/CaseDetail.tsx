@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../store/DataContext';
 import { useI18n } from '../store/I18nContext';
-import { Case, Task, Log, Reminder, Deadline, Party, Proceeding, PropertyPreservation } from '../types';
+import { Case, Task, Log, Reminder, Deadline, Party, Proceeding, PropertyPreservation, ActionReminder } from '../types';
 import { calculateTaskDuration, formatTimeDuration, nowISO, uuid, formatDateTime } from '../utils';
 import { 
   Play, Pause, CheckCircle, RotateCcw, Plus, Trash2, Calendar, 
-  FileText, Clock, AlertTriangle, MessageSquare, ChevronDown, Scale, Edit2
+  FileText, Clock, AlertTriangle, MessageSquare, ChevronDown, Scale, Edit2, List
 } from 'lucide-react';
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -273,6 +273,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
               <button onClick={completeTask} className="h-10 w-10 sm:h-8 sm:w-8 rounded bg-gray-100 hover:tint-bg text-gray-600 hover:tint-text transition-colors flex items-center justify-center">
                 <CheckCircle size={16} />
               </button>
+              <button
+                type="button"
+                className={`h-10 w-10 sm:h-8 sm:w-8 rounded border transition-colors flex items-center justify-center ${showSessions ? 'tint-bg tint-text tint-border' : 'bg-white border-gray-200 text-gray-600 hover:tint-bg hover:tint-text'}`}
+                onClick={() => setShowSessions(!showSessions)}
+                title={t('tasks.sessions')}
+              >
+                <List size={16} />
+              </button>
             </div>
           </>
         )}
@@ -280,16 +288,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
              <Trash2 size={14} />
         </button>
       </div>
-      <div className="mt-2">
-        <button
-          type="button"
-          className={`text-xs px-2 py-1 rounded border ${showSessions ? 'bg-gray-100' : 'bg-white'}`}
-          onClick={() => setShowSessions(!showSessions)}
-        >
-          {t('tasks.sessions')}
-        </button>
-        {showSessions && (
-          <div className="mt-2 space-y-2">
+      {showSessions && (
+          <div className="mt-2 space-y-2 w-full">
             {(task.sessions || []).map((s, idx) => (
               <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center border rounded p-2 bg-gray-50">
                 <div className="sm:col-span-5">
@@ -330,8 +330,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
               <div className="text-xs text-gray-400">{t('tasks.noSessions')}</div>
             )}
           </div>
-        )}
-      </div>
+      )}
       {showManualInput && (
         <div className="fixed inset-0 z-[140] bg-black/20 backdrop-blur-[2px] flex items-center justify-center p-3" onClick={() => setShowManualInput(false)}>
           <div className="craft-surface w-[360px] max-w-[95vw] p-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
@@ -915,7 +914,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
 export const CaseDetail: React.FC = () => {
   const { cases, activeCaseId, activeCaseTab, updateCase, deleteCase, navigate, parties } = useData();
   const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState<'info' | 'procedure' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'procedure' | 'tasks' | 'schedule' | 'reminders' | 'deadlines' | 'logs' | 'trash'>('info');
   const currentCase = cases.find(c => c.id === activeCaseId);
   const [isEditing, setIsEditing] = useState(false);
   const [draftCase, setDraftCase] = useState<Case | null>(null);
@@ -924,6 +923,14 @@ export const CaseDetail: React.FC = () => {
   const [remEditTitle, setRemEditTitle] = useState('');
   const [remEditDate, setRemEditDate] = useState('');
   const [remEditTime, setRemEditTime] = useState('');
+  const [showCreateTask, setShowCreateTask] = useState(false);
+  const [newTaskDesc, setNewTaskDesc] = useState('');
+  const [newTaskType, setNewTaskType] = useState<'文书' | '会议' | '咨询' | '其他'>('文书');
+  const [newTaskAssignee, setNewTaskAssignee] = useState('');
+  const [newTaskNotes, setNewTaskNotes] = useState('');
+  const [newReminderTitle, setNewReminderTitle] = useState('');
+  const [newReminderDate, setNewReminderDate] = useState('');
+  const [newReminderNote, setNewReminderNote] = useState('');
 
   useEffect(() => {
     if (currentCase) {
@@ -943,12 +950,24 @@ export const CaseDetail: React.FC = () => {
   };
 
   const handleAddTask = () => {
+    setNewTaskType('文书');
+    setNewTaskDesc('');
+    setNewTaskAssignee('');
+    setNewTaskNotes('');
+    setShowCreateTask(true);
+  };
+
+  const confirmCreateTask = () => {
+    if (!newTaskDesc.trim()) {
+      alert('请先填写任务内容');
+      return;
+    }
     const newTask: Task = {
       id: uuid(),
-      type: '文书',
-      desc: '',
-      assignee: '',
-      notes: '',
+      type: newTaskType,
+      desc: newTaskDesc.trim(),
+      assignee: newTaskAssignee.trim(),
+      notes: newTaskNotes.trim(),
       createdAt: nowISO(),
       completedAt: null,
       sessions: [],
@@ -956,6 +975,7 @@ export const CaseDetail: React.FC = () => {
       isCompleted: false
     };
     updateCase({ ...currentCase, tasks: [newTask, ...currentCase.tasks] });
+    setShowCreateTask(false);
   };
 
   const handleDeleteTask = (id: string) => {
@@ -1119,7 +1139,7 @@ export const CaseDetail: React.FC = () => {
 
       {/* Tabs */}
       <div className="w-full px-3 md:px-8 py-2.5 border-b border-[#e2e8f0] flex gap-2 text-sm overflow-x-auto overflow-y-hidden scrollbar-hide snap-x snap-mandatory">
-        {['info', 'procedure', 'tasks', 'schedule', 'deadlines', 'logs', 'trash'].map(tab => (
+        {['info', 'procedure', 'tasks', 'schedule', 'reminders', 'deadlines', 'logs', 'trash'].map(tab => (
           <div 
             key={tab}
             onClick={() => setActiveTab(tab as any)}
@@ -1364,6 +1384,100 @@ export const CaseDetail: React.FC = () => {
             </div>
           )}
 
+          {activeTab === 'reminders' && (
+            <div className="animate-fade-in">
+              <div className="tint-bg border tint-border p-4 rounded-lg mb-6 flex flex-col sm:flex-row sm:items-end gap-2 min-w-0">
+                <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs tint-text font-bold mb-1">{t('reminders.new')}</label>
+                    <input
+                      value={newReminderTitle}
+                      onChange={(e) => setNewReminderTitle(e.target.value)}
+                      placeholder={t('reminders.title')}
+                      className="w-full text-sm p-2 rounded border tint-border outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs tint-text font-bold mb-1">{t('reminders.dueDate')}</label>
+                    <input
+                      type="date"
+                      value={newReminderDate}
+                      onChange={(e) => setNewReminderDate(e.target.value)}
+                      className="w-full text-sm p-2 rounded border tint-border outline-none"
+                    />
+                  </div>
+                  <div className="sm:col-span-3">
+                    <input
+                      value={newReminderNote}
+                      onChange={(e) => setNewReminderNote(e.target.value)}
+                      placeholder={t('reminders.note')}
+                      className="w-full text-sm p-2 rounded border tint-border outline-none"
+                    />
+                  </div>
+                </div>
+                <button
+                  className="accent-bg accent-bg-hover text-white px-4 py-2 rounded text-sm shadow-sm h-[38px] w-full sm:w-auto"
+                  onClick={() => {
+                    if (!newReminderTitle.trim()) {
+                      alert('请先填写提醒内容');
+                      return;
+                    }
+                    const item: ActionReminder = {
+                      id: uuid(),
+                      title: newReminderTitle.trim(),
+                      note: newReminderNote.trim(),
+                      dueDate: newReminderDate,
+                      completed: false,
+                    };
+                    updateCase({ ...currentCase, actionReminders: [item, ...(currentCase.actionReminders || [])] });
+                    setNewReminderTitle('');
+                    setNewReminderDate('');
+                    setNewReminderNote('');
+                  }}
+                >
+                  {t('reminders.add')}
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {(currentCase.actionReminders || []).map((item) => (
+                  <div key={item.id} className={`flex items-center justify-between gap-2 p-3 rounded-xl border min-w-0 ${item.completed ? 'tint-bg border tint-border opacity-70' : 'bg-white/92 border tint-border shadow-sm'}`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={item.completed}
+                        onChange={() => {
+                          const next = (currentCase.actionReminders || []).map((x) => x.id === item.id ? { ...x, completed: !x.completed } : x);
+                          updateCase({ ...currentCase, actionReminders: next });
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 accent-text focus:ring-[var(--ui-accent-soft-2)]"
+                      />
+                      <div className="min-w-0">
+                        <div className={`font-medium text-sm break-words ${item.completed ? 'line-through text-gray-500' : 'tint-text'}`}>{item.title}</div>
+                        <div className="text-xs text-gray-500">
+                          {item.dueDate ? `${t('reminders.dueDate')}: ${item.dueDate}` : ''}
+                          {item.note ? `  ·  ${item.note}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const next = (currentCase.actionReminders || []).filter((x) => x.id !== item.id);
+                        updateCase({ ...currentCase, actionReminders: next });
+                      }}
+                      className="text-gray-300 hover:tint-text shrink-0"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                {(currentCase.actionReminders || []).length === 0 && (
+                  <div className="text-center py-10 text-gray-400">{t('reminders.noItems')}</div>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'deadlines' && (
             <div className="animate-fade-in">
               <div className="tint-bg border tint-border p-4 rounded-lg mb-6 flex flex-col sm:flex-row sm:items-end gap-2 min-w-0">
@@ -1485,6 +1599,48 @@ export const CaseDetail: React.FC = () => {
             <div className="flex justify-end gap-2">
               <button className="px-3 py-1.5 border tint-border rounded text-sm" onClick={() => setShowDeleteConfirm(false)}>取消</button>
               <button className="px-3 py-1.5 border tint-border text-white accent-bg rounded text-sm accent-bg-hover" onClick={() => { setShowDeleteConfirm(false); deleteCase(currentCase.id); }}>确认删除</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateTask && (
+        <div className="fixed inset-0 bg-black/25 backdrop-blur-sm z-[60] flex items-center justify-center p-3" onClick={() => setShowCreateTask(false)}>
+          <div className="craft-surface w-[420px] max-w-[95vw] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="text-base font-semibold mb-3">新增任务</div>
+            <div className="space-y-2">
+              <select
+                className="w-full text-sm p-2 rounded border tint-border outline-none bg-white"
+                value={newTaskType}
+                onChange={(e) => setNewTaskType(e.target.value as any)}
+              >
+                <option value="文书">文书</option>
+                <option value="会议">会议</option>
+                <option value="咨询">咨询</option>
+                <option value="其他">其他</option>
+              </select>
+              <input
+                className="w-full text-sm p-2 rounded border tint-border outline-none bg-white"
+                placeholder="任务内容（必填）"
+                value={newTaskDesc}
+                onChange={(e) => setNewTaskDesc(e.target.value)}
+              />
+              <input
+                className="w-full text-sm p-2 rounded border tint-border outline-none bg-white"
+                placeholder="负责人（可选）"
+                value={newTaskAssignee}
+                onChange={(e) => setNewTaskAssignee(e.target.value)}
+              />
+              <textarea
+                className="w-full text-sm p-2 rounded border tint-border outline-none bg-white min-h-[76px]"
+                placeholder="备注（可选）"
+                value={newTaskNotes}
+                onChange={(e) => setNewTaskNotes(e.target.value)}
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="px-3 py-1.5 border tint-border rounded text-sm" onClick={() => setShowCreateTask(false)}>取消</button>
+              <button className="px-3 py-1.5 accent-bg accent-bg-hover text-white rounded text-sm" onClick={confirmCreateTask}>确认新增</button>
             </div>
           </div>
         </div>

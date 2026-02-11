@@ -29,11 +29,11 @@ interface DataContextType {
   signOut: () => Promise<void>;
   activeView: 'dashboard' | 'parties' | 'archives' | 'case' | 'settings';
   activeCaseId: string | null;
-  activeCaseTab: 'info' | 'procedure' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash';
+  activeCaseTab: 'info' | 'procedure' | 'tasks' | 'schedule' | 'reminders' | 'deadlines' | 'logs' | 'trash';
   navigate: (
     view: 'dashboard' | 'parties' | 'archives' | 'case' | 'settings',
     caseId?: string | null,
-    caseTab?: 'info' | 'procedure' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'
+    caseTab?: 'info' | 'procedure' | 'tasks' | 'schedule' | 'reminders' | 'deadlines' | 'logs' | 'trash'
   ) => void;
 }
 
@@ -62,6 +62,7 @@ const normalizeCase = (item: any): Case => ({
   tasks: Array.isArray(item?.tasks) ? item.tasks : [],
   logs: Array.isArray(item?.logs) ? item.logs : [],
   reminders: Array.isArray(item?.reminders) ? item.reminders : [],
+  actionReminders: Array.isArray(item?.actionReminders) ? item.actionReminders : [],
   deadlines: Array.isArray(item?.deadlines) ? item.deadlines : [],
   clients: Array.isArray(item?.clients) ? item.clients : [],
   opponents: Array.isArray(item?.opponents) ? item.opponents : [],
@@ -98,12 +99,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [activeView, setActiveView] = useState<'dashboard' | 'parties' | 'archives' | 'case' | 'settings'>('dashboard');
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
-  const [activeCaseTab, setActiveCaseTab] = useState<'info' | 'procedure' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash'>('info');
+  const [activeCaseTab, setActiveCaseTab] = useState<'info' | 'procedure' | 'tasks' | 'schedule' | 'reminders' | 'deadlines' | 'logs' | 'trash'>('info');
 
   const navigate = (
     view: 'dashboard' | 'parties' | 'archives' | 'case' | 'settings',
     caseId: string | null = null,
-    caseTab: 'info' | 'procedure' | 'tasks' | 'deadlines' | 'logs' | 'schedule' | 'trash' = 'info'
+    caseTab: 'info' | 'procedure' | 'tasks' | 'schedule' | 'reminders' | 'deadlines' | 'logs' | 'trash' = 'info'
   ) => {
     setActiveView(view);
     setActiveCaseId(caseId);
@@ -169,7 +170,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const savedTitle = localStorage.getItem(APP_KEY_TITLE);
     setCases(savedCases);
     setParties(savedParties);
-    if (savedTitle) setAppTitleState(savedTitle);
+    if (savedTitle !== null) setAppTitleState(savedTitle);
   }, []);
 
   useEffect(() => {
@@ -200,7 +201,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const bootstrap = async () => {
       const savedTitle = localStorage.getItem(APP_KEY_TITLE);
-      if (savedTitle) setAppTitleState(savedTitle);
+      if (savedTitle !== null) setAppTitleState(savedTitle);
 
       if (isSupabaseConfigured && supabase) {
         if (authLoading) return;
@@ -366,7 +367,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setParties([]);
   };
 
-  const setAppTitle = (title: string) => setAppTitleState(title);
+  const setAppTitle = (title: string) => {
+    setAppTitleState(title);
+    localStorage.setItem(APP_KEY_TITLE, title);
+  };
 
   const updateCase = (updatedCase: Case) => {
     setCases((prev) => prev.map((item) => (item.id === updatedCase.id ? normalizeCase({ ...updatedCase, updatedAt: nowISO() }) : item)));

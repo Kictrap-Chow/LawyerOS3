@@ -18,82 +18,94 @@ export const GlobalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
-  const results = [];
+  const results: Array<{ type: string; title: string; sub: string; action: () => void }> = [];
   const q = query.toLowerCase();
 
+  const deepText = (val: any): string => {
+    if (val === null || val === undefined) return '';
+    if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return String(val).toLowerCase();
+    if (Array.isArray(val)) return val.map(deepText).join(' ');
+    if (typeof val === 'object') return Object.values(val).map(deepText).join(' ');
+    return '';
+  };
+
+  const pushResult = (item: { type: string; title: string; sub: string; action: () => void }) => {
+    const exists = results.some((r) => r.type === item.type && r.title === item.title && r.sub === item.sub);
+    if (!exists) results.push(item);
+  };
+
   if (q) {
-    // Search Cases
+    // Search Cases (all fields)
     cases.forEach(c => {
-      // Search basic case info
-      if (
-        c.name?.toLowerCase().includes(q) || 
-        c.type?.toLowerCase().includes(q) ||
-        c.clientContactName?.toLowerCase().includes(q) ||
-        c.clientContactInfo?.toLowerCase().includes(q) ||
-        c.specialProjectRemarks?.toLowerCase().includes(q)
-      ) {
-        results.push({ type: 'Case', title: c.name, sub: c.type, action: () => navigate('case', c.id) });
+      const caseBlob = deepText(c);
+      if (caseBlob.includes(q)) {
+        pushResult({ type: 'Case', title: c.name, sub: c.type, action: () => navigate('case', c.id, 'info') });
       }
 
       // Search Tasks
       c.tasks?.forEach(t => {
-        if (t.desc?.toLowerCase().includes(q) || t.notes?.toLowerCase().includes(q)) {
-          results.push({ type: 'Task', title: t.desc, sub: `in ${c.name}`, action: () => navigate('case', c.id) });
+        if (deepText(t).includes(q)) {
+          pushResult({ type: 'Task', title: t.desc || '(No Title)', sub: `in ${c.name}`, action: () => navigate('case', c.id, 'tasks') });
         }
       });
 
       // Search Logs
       c.logs?.forEach(l => {
-        if (l.content?.toLowerCase().includes(q)) {
-          results.push({ type: 'Log', title: l.content.substring(0, 50) + '...', sub: `in ${c.name}`, action: () => navigate('case', c.id) });
+        if (deepText(l).includes(q)) {
+          const title = (l.content || '').trim();
+          pushResult({ type: 'Log', title: title ? `${title.substring(0, 50)}...` : '(Empty Log)', sub: `in ${c.name}`, action: () => navigate('case', c.id, 'logs') });
         }
       });
 
       // Search Case Parties (Clients & Opponents)
       [...(c.clients || []), ...(c.opponents || [])].forEach(p => {
-        if (
-          p.name?.toLowerCase().includes(q) || 
-          p.idCode?.includes(q) || 
-          p.address?.includes(q) || 
-          p.note?.toLowerCase().includes(q)
-        ) {
-           results.push({ type: 'Party', title: p.name, sub: `in ${c.name}`, action: () => navigate('case', c.id) });
+        if (deepText(p).includes(q)) {
+           pushResult({ type: 'Party', title: p.name || '(No Name)', sub: `in ${c.name}`, action: () => navigate('case', c.id, 'info') });
         }
       });
 
       // Search Proceedings
       if (c.litigation && c.litigation.proceedings) {
         c.litigation.proceedings.forEach(proc => {
-          // Helper to safely search personnel array if it exists, or fallback to legacy fields
-          const searchPersonnel = () => {
-             if ((proc as any).personnel) {
-                return (proc as any).personnel.some((per: any) => 
-                  per.name?.toLowerCase().includes(q) || per.role?.toLowerCase().includes(q)
-                );
-             }
-             // Legacy fields check
-             return (
-               proc.judgeName?.toLowerCase().includes(q) ||
-               proc.clerkName?.toLowerCase().includes(q)
-             );
-          };
-
-          if (
-            proc.caseNo?.toLowerCase().includes(q) ||
-            proc.courtName?.toLowerCase().includes(q) ||
-            proc.stageName?.toLowerCase().includes(q) ||
-            searchPersonnel()
-          ) {
-            results.push({ type: 'Proceeding', title: `${proc.stageName} - ${proc.caseNo || 'No Case No'}`, sub: `in ${c.name}`, action: () => navigate('case', c.id) });
+          if (deepText(proc).includes(q)) {
+            pushResult({ type: 'Proceeding', title: `${proc.stageName || 'Stage'} - ${proc.caseNo || 'No Case No'}`, sub: `in ${c.name}`, action: () => navigate('case', c.id, 'procedure') });
           }
         });
       }
+
+      // Search Property Preservation
+      c.litigation?.propertyPreservations?.forEach(item => {
+        if (deepText(item).includes(q)) {
+          pushResult({ type: 'Preserve', title: item.caseNo || item.courtName || 'Property Preservation', sub: `in ${c.name}`, action: () => navigate('case', c.id, 'procedure') });
+        }
+      });
+
+      // Search Schedule
+      c.reminders?.forEach(r => {
+        if (deepText(r).includes(q)) {
+          pushResult({ type: 'Schedule', title: r.title || '(No Title)', sub: `in ${c.name}`, action: () => navigate('case', c.id, 'schedule') });
+        }
+      });
+
+      // Search Deadlines
+      c.deadlines?.forEach(d => {
+        if (deepText(d).includes(q)) {
+          pushResult({ type: 'Deadline', title: d.title || '(No Title)', sub: `in ${c.name}`, action: () => navigate('case', c.id, 'deadlines') });
+        }
+      });
+
+      // Search Action Reminders
+      c.actionReminders?.forEach(r => {
+        if (deepText(r).includes(q)) {
+          pushResult({ type: 'Reminder', title: r.title || '(No Title)', sub: `in ${c.name}`, action: () => navigate('case', c.id, 'reminders') });
+        }
+      });
     });
 
     // Search Global Parties
     parties.forEach(p => {
-       if (p.name?.toLowerCase().includes(q) || p.idCode?.includes(q)) {
-         results.push({ type: 'Party', title: p.name, sub: p.idCode, action: () => navigate('parties') });
+       if (deepText(p).includes(q)) {
+         pushResult({ type: 'Party', title: p.name || '(No Name)', sub: p.idCode || '', action: () => navigate('parties') });
        }
     });
   }

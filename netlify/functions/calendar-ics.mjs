@@ -1,17 +1,3 @@
-import express from 'express';
-import cors from 'cors';
-import bodyParser from 'body-parser';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-const DB_FILE = path.join(__dirname, 'data', 'database.json');
-
 const escapeIcs = (s = '') =>
   String(s)
     .replace(/\\/g, '\\\\')
@@ -92,68 +78,51 @@ const buildIcs = (cases = []) => {
   return `${lines.join('\r\n')}\r\n`;
 };
 
-// Middleware
-app.use(cors());
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(express.static(path.join(__dirname, 'dist')));
-
-// Ensure data directory exists
-if (!fs.existsSync(path.join(__dirname, 'data'))) {
-  fs.mkdirSync(path.join(__dirname, 'data'));
-}
-
-// Initialize DB if not exists
-if (!fs.existsSync(DB_FILE)) {
-  fs.writeFileSync(DB_FILE, JSON.stringify({ cases: [], parties: [] }, null, 2));
-}
-
-// API Routes
-app.get('/api/data', (req, res) => {
+export default async (req) => {
   try {
-    if (fs.existsSync(DB_FILE)) {
-      const data = fs.readFileSync(DB_FILE, 'utf8');
-      res.json(JSON.parse(data));
-    } else {
-      res.json({ cases: [], parties: [] });
+    const url = process.env.VITE_SUPABASE_URL;
+    const ownerId = process.env.CALENDAR_OWNER_ID;
+    const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    const requiredToken = process.env.CALENDAR_FEED_TOKEN;
+
+    if (!url || !ownerId) {
+      return new Response('Missing VITE_SUPABASE_URL or CALENDAR_OWNER_ID', { status: 500 });
     }
+    if (requiredToken && req.queryStringParameters?.token !== requiredToken) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+    const key = serviceRole || anonKey;
+    if (!key) {
+      return new Response('Missing SUPABASE_SERVICE_ROLE_KEY or VITE_SUPABASE_ANON_KEY', { status: 500 });
+    }
+
+    const endpoint = `${url}/rest/v1/cases?select=id,data&owner_id=eq.${encodeURIComponent(ownerId)}&order=updated_at.desc`;
+    const res = await fetch(endpoint, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+      },
+    });
+
+    if (!res.ok) {
+      const msg = await res.text();
+      return new Response(`Supabase query failed: ${msg}`, { status: 500 });
+    }
+
+    const rows = await res.json();
+    const cases = (rows || []).map((r) => ({ ...(r?.data || {}), id: r?.id }));
+    const ics = buildIcs(cases);
+
+    return new Response(ics, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'Cache-Control': 'public, max-age=300',
+      },
+    });
   } catch (err) {
-    console.error('Error reading database:', err);
-    res.status(500).json({ error: 'Failed to read database' });
+    return new Response(`Calendar feed error: ${err?.message || 'unknown'}`, { status: 500 });
   }
-});
+};
 
-app.post('/api/data', (req, res) => {
-  try {
-    const data = req.body;
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Error writing database:', err);
-    res.status(500).json({ error: 'Failed to save database' });
-  }
-});
-
-app.get('/api/calendar.ics', (req, res) => {
-  try {
-    const data = fs.existsSync(DB_FILE)
-      ? JSON.parse(fs.readFileSync(DB_FILE, 'utf8'))
-      : { cases: [] };
-    const ics = buildIcs(Array.isArray(data?.cases) ? data.cases : []);
-    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, max-age=300');
-    res.send(ics);
-  } catch (err) {
-    console.error('Error building ics:', err);
-    res.status(500).send('Failed to generate calendar feed');
-  }
-});
-
-// Serve React App for any other route
-app.use((req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-});
-
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-  console.log(`Data stored in: ${DB_FILE}`);
-});

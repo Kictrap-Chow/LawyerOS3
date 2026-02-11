@@ -29,6 +29,7 @@ export const CaseForm: React.FC<CaseFormProps> = ({ onClose, onSave }) => {
       tasks: [],
       logs: [],
       reminders: [],
+      actionReminders: [],
       deadlines: []
     };
 

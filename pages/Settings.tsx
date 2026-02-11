@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useI18n } from '../store/I18nContext';
 import { useTheme } from '../store/ThemeContext';
 import { cn } from '../utils';
@@ -14,6 +14,13 @@ export const Settings: React.FC = () => {
   const [authMessage, setAuthMessage] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [calendarToken, setCalendarToken] = useState(() => localStorage.getItem('calendarFeedToken') || '');
+
+  const calendarFeedUrl = useMemo(() => {
+    if (typeof window === 'undefined') return '';
+    const base = `${window.location.origin}/api/calendar.ics`;
+    return calendarToken.trim() ? `${base}?token=${encodeURIComponent(calendarToken.trim())}` : base;
+  }, [calendarToken]);
 
   const toFriendlyAuthMessage = (raw?: string) => {
     const msg = (raw || '').toLowerCase();
@@ -58,6 +65,21 @@ export const Settings: React.FC = () => {
     } finally {
       e.target.value = '';
     }
+  };
+
+  const copyCalendarUrl = async () => {
+    if (!calendarFeedUrl) return;
+    try {
+      await navigator.clipboard.writeText(calendarFeedUrl);
+      alert('日历订阅链接已复制');
+    } catch {
+      alert('复制失败，请手动复制');
+    }
+  };
+
+  const saveCalendarToken = (value: string) => {
+    setCalendarToken(value);
+    localStorage.setItem('calendarFeedToken', value);
   };
 
   return (
@@ -209,6 +231,30 @@ export const Settings: React.FC = () => {
             <FileUp size={14} />
             导入数据
           </button>
+        </div>
+      </div>
+
+      <div className="craft-panel p-4 md:p-5 mb-4">
+        <h2 className="text-sm font-semibold tint-text uppercase mb-3">日历同步（只读订阅）</h2>
+        <div className="text-xs text-gray-500 mb-2">将下方链接添加到 macOS / iPhone 日历，可自动查看系统中的日程与期限（单向同步）。</div>
+        <input
+          value={calendarFeedUrl}
+          readOnly
+          className="w-full text-xs bg-white border tint-border rounded px-3 py-2 outline-none"
+        />
+        <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <button onClick={copyCalendarUrl} className="px-3 py-2 text-sm rounded border tint-border hover:bg-white">复制订阅链接</button>
+          <a href={calendarFeedUrl} target="_blank" rel="noreferrer" className="px-3 py-2 text-sm rounded border tint-border hover:bg-white text-center">打开订阅地址</a>
+          <a href="https://support.apple.com/zh-cn/guide/calendar/icl1022/mac" target="_blank" rel="noreferrer" className="px-3 py-2 text-sm rounded border tint-border hover:bg-white text-center">Apple 日历帮助</a>
+        </div>
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <label className="block text-xs tint-text mb-1">订阅密钥（可选）</label>
+          <input
+            value={calendarToken}
+            onChange={(e) => saveCalendarToken(e.target.value)}
+            placeholder="如果配置了 CALENDAR_FEED_TOKEN，请在这里填同一串字符"
+            className="w-full text-xs bg-white border tint-border rounded px-3 py-2 outline-none"
+          />
         </div>
       </div>
     </div>

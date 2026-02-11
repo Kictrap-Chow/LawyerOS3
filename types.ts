@@ -92,6 +92,14 @@ export interface Reminder {
   title: string;
 }
 
+export interface ActionReminder {
+  id: string;
+  title: string;
+  note: string;
+  dueDate: string; // YYYY-MM-DD (optional, empty allowed)
+  completed: boolean;
+}
+
 export interface Deadline {
   id: string;
   date: string; // YYYY-MM-DD
@@ -124,6 +132,7 @@ export interface Case {
   tasks: Task[];
   logs: Log[];
   reminders: Reminder[];
+  actionReminders: ActionReminder[];
   deadlines: Deadline[];
   trash?: Trash;
 }
