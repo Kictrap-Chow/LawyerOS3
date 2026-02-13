@@ -206,7 +206,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (isSupabaseConfigured && supabase) {
         if (authLoading) return;
         if (!authUser?.id) {
-          applyDataset([], [], false);
+          // Keep local data visible when signed out; only disable cloud sync.
+          loadFromLocal();
           setSyncStatus('offline');
           setSyncError('请先在设置页登录后再同步');
           setIsBootstrapped(true);
@@ -363,8 +364,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
-    setCases([]);
-    setParties([]);
+    // Do not wipe local data on sign out; user can still view/edit locally.
+    setSyncStatus('offline');
+    setSyncError('请先在设置页登录后再同步');
   };
 
   const setAppTitle = (title: string) => {

@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 type ThemeFont = 'chatgpt' | 'system' | 'serif';
+export type ThemePreset = 'liquid-glass' | 'craft-light' | 'obsidian-primary';
 
 interface ThemeContextType {
+  preset: ThemePreset;
+  setPreset: (preset: ThemePreset) => void;
   accent: string;
   setAccent: (hex: string) => void;
   textColor: string;
@@ -14,6 +17,7 @@ interface ThemeContextType {
 const ACCENT_KEY = 'lawyerThemeAccent';
 const TEXT_KEY = 'lawyerThemeTextColor';
 const FONT_KEY = 'lawyerThemeFont';
+const PRESET_KEY = 'lawyerThemePreset';
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
@@ -54,18 +58,26 @@ const fontFamilyByType: Record<ThemeFont, string> = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [preset, setPresetState] = useState<ThemePreset>('liquid-glass');
   const [accent, setAccentState] = useState('#10a37f');
   const [textColor, setTextColorState] = useState('#1f2937');
   const [font, setFontState] = useState<ThemeFont>('chatgpt');
 
   useEffect(() => {
+    const savedPreset = localStorage.getItem(PRESET_KEY) as ThemePreset | null;
     const savedAccent = localStorage.getItem(ACCENT_KEY);
     const savedText = localStorage.getItem(TEXT_KEY);
     const savedFont = localStorage.getItem(FONT_KEY) as ThemeFont | null;
+    if (savedPreset === 'liquid-glass' || savedPreset === 'craft-light' || savedPreset === 'obsidian-primary') setPresetState(savedPreset);
     if (savedAccent && /^#[\da-fA-F]{6}$/.test(savedAccent)) setAccentState(savedAccent);
     if (savedText && /^#[\da-fA-F]{6}$/.test(savedText)) setTextColorState(savedText);
     if (savedFont === 'chatgpt' || savedFont === 'system' || savedFont === 'serif') setFontState(savedFont);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(PRESET_KEY, preset);
+    document.documentElement.setAttribute('data-theme', preset);
+  }, [preset]);
 
   useEffect(() => {
     localStorage.setItem(ACCENT_KEY, accent);
@@ -95,6 +107,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const value = useMemo(
     () => ({
+      preset,
+      setPreset: setPresetState,
       accent,
       setAccent: setAccentState,
       textColor,
@@ -102,7 +116,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       font,
       setFont: setFontState,
     }),
-    [accent, textColor, font]
+    [preset, accent, textColor, font]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

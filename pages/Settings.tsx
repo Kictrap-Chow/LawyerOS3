@@ -1,13 +1,13 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useI18n } from '../store/I18nContext';
-import { useTheme } from '../store/ThemeContext';
+import { ThemePreset, useTheme } from '../store/ThemeContext';
 import { cn } from '../utils';
 import { useData } from '../store/DataContext';
 import { FileJson, FileUp } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const { lang, setLang } = useI18n();
-  const { accent, setAccent, textColor, setTextColor, font, setFont } = useTheme();
+  const { preset, setPreset, accent, setAccent, textColor, setTextColor, font, setFont } = useTheme();
   const { appTitle, setAppTitle, isSupabaseEnabled, authLoading, isAuthenticated, userEmail, signIn, signUp, signOut, exportData, importData } = useData();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -81,6 +81,12 @@ export const Settings: React.FC = () => {
     setCalendarToken(value);
     localStorage.setItem('calendarFeedToken', value);
   };
+
+  const presetOptions: Array<{ key: ThemePreset; title: string; desc: string }> = [
+    { key: 'liquid-glass', title: 'Liquid Glass', desc: '高透光玻璃、柔光氛围' },
+    { key: 'craft-light', title: 'Craft Light', desc: '浅色卡片、清爽文档感' },
+    { key: 'obsidian-primary', title: 'Obsidian Primary', desc: '暖棕低饱和、专注阅读感' },
+  ];
 
   return (
     <div className="max-w-3xl mx-auto p-3 md:p-6 animate-fade-in">
@@ -178,6 +184,24 @@ export const Settings: React.FC = () => {
 
       <div className="craft-panel p-4 md:p-5 mb-4">
         <h2 className="text-sm font-semibold tint-text uppercase mb-3">外观</h2>
+        <div className="mb-3">
+          <div className="text-xs text-[#787774] mb-2">主题预设</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {presetOptions.map((item) => (
+              <button
+                key={item.key}
+                onClick={() => setPreset(item.key)}
+                className={cn(
+                  "text-left rounded-xl border px-3 py-2 transition-colors",
+                  preset === item.key ? 'accent-border accent-soft-bg' : 'bg-white/80 border-gray-200 hover:bg-white'
+                )}
+              >
+                <div className="text-sm font-semibold text-strong-theme">{item.title}</div>
+                <div className="text-xs text-[#787774] mt-1">{item.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <label className="flex items-center gap-2 text-sm bg-white/80 border border-[#e9e9e7] rounded-xl px-3 py-2">
             <span className="text-[#787774] min-w-[72px]">强调色</span>
