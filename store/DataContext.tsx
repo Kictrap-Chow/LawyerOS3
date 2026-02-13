@@ -42,6 +42,8 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 const APP_KEY_CASES = 'lawyerCases_v18';
 const APP_KEY_PARTIES = 'lawyerParties_v18';
 const APP_KEY_TITLE = 'lawyerAppTitle_v18';
+const APP_KEY_SNAPSHOTS = 'lawyerDataSnapshots_v1';
+const SNAPSHOT_KEEP = 12;
 
 const normalizeCaseType = (rawType: any) => {
   if (rawType === '争议解决' || rawType === 'Dispute') return '诉讼';
@@ -96,6 +98,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const skipNextSyncRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
   const reloadTimerRef = useRef<number | null>(null);
+  const lastAutoSnapshotAtRef = useRef(0);
 
   const [activeView, setActiveView] = useState<'dashboard' | 'parties' | 'archives' | 'case' | 'settings'>('dashboard');
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
@@ -114,6 +117,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setActiveCaseTab('info');
     }
   };
+
+  const hasAnyData = (nextCases: Case[], nextParties: Party[]) => nextCases.length > 0 || nextParties.length > 0;
+
+  const createSnapshot = useCallback((reason: string, nextCases: Case[], nextParties: Party[]) => {
+    if (!hasAnyData(nextCases, nextParties)) return;
+    try {
+      const current = localStorage.getItem(APP_KEY_SNAPSHOTS);
+      const list = current ? JSON.parse(current) : [];
+      const snapshots = Array.isArray(list) ? list : [];
+      snapshots.unshift({
+        createdAt: nowISO(),
+        reason,
+        cases: nextCases,
+        parties: nextParties,
+      });
+      localStorage.setItem(APP_KEY_SNAPSHOTS, JSON.stringify(snapshots.slice(0, SNAPSHOT_KEEP)));
+    } catch {
+      // keep snapshot best-effort
+    }
+  }, []);
 
   const applyDataset = (nextCases: Case[], nextParties: Party[], fromRemote: boolean) => {
     if (fromRemote) {
@@ -138,6 +161,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const nextCases = (casesRes.data || []).map((row: any) => normalizeCase({ ...(row.data || {}), id: row.id }));
       const nextParties = (partiesRes.data || []).map((row: any) => ({ ...(row.data || {}), id: row.id } as Party));
 
+      const localCaseCount = parseLocalList<Case>(APP_KEY_CASES).length;
+      const localPartyCount = parseLocalList<Party>(APP_KEY_PARTIES).length;
+      const remoteEmpty = nextCases.length === 0 && nextParties.length === 0;
+      const localHasData = localCaseCount > 0 || localPartyCount > 0;
+      if (remoteEmpty && localHasData) {
+        loadFromLocal();
+        setSyncStatus('error');
+        setSyncError('检测到云端为空，已保留本地数据并阻止覆盖。请确认登录账号后再同步。');
+        return false;
+      }
+
       applyDataset(nextCases, nextParties, true);
       setSyncStatus('online');
       setSyncError(null);
@@ -148,7 +182,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSyncError(error?.message || 'Supabase load failed');
       return false;
     }
-  }, []);
+  }, [loadFromLocal]);
 
   const loadFromServerFile = useCallback(async () => {
     try {
@@ -253,6 +287,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setSyncStatus('syncing');
 
+      // Safety guard: never let empty local data erase non-empty cloud data automatically.
+      if (nextCases.length === 0 && nextParties.length === 0) {
+        const [caseCountRes, partyCountRes] = await Promise.all([
+          supabase.from('cases').select('id', { head: true, count: 'exact' }).eq('owner_id', ownerId),
+          supabase.from('parties').select('id', { head: true, count: 'exact' }).eq('owner_id', ownerId),
+        ]);
+        if (caseCountRes.error) throw caseCountRes.error;
+        if (partyCountRes.error) throw partyCountRes.error;
+        const remoteCount = (caseCountRes.count || 0) + (partyCountRes.count || 0);
+        if (remoteCount > 0) {
+          setSyncStatus('error');
+          setSyncError('已阻止空数据覆盖云端。请先从备份恢复或确认账号后再操作。');
+          return;
+        }
+      }
+
       const { error: caseUpsertError } = await supabase.from('cases').upsert(
         nextCases.map((item) => ({ id: item.id, owner_id: ownerId, data: item })),
         { onConflict: 'id' }
@@ -302,6 +352,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem(APP_KEY_CASES, JSON.stringify(cases));
     localStorage.setItem(APP_KEY_PARTIES, JSON.stringify(parties));
 
+    const now = Date.now();
+    if (hasAnyData(cases, parties) && now - lastAutoSnapshotAtRef.current > 5 * 60 * 1000) {
+      createSnapshot('auto', cases, parties);
+      lastAutoSnapshotAtRef.current = now;
+    }
+
     if (!isBootstrapped) return;
 
     if (skipNextSyncRef.current) {
@@ -317,7 +373,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
-  }, [cases, parties, syncToSupabase, isBootstrapped, authUser?.id]);
+  }, [cases, parties, syncToSupabase, isBootstrapped, authUser?.id, createSnapshot]);
 
   useEffect(() => {
     localStorage.setItem(APP_KEY_TITLE, appTitle);
@@ -404,6 +460,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = JSON.parse(jsonStr);
       const importedCases = (Array.isArray(data) ? data : (data.cases || [])).map(normalizeCase);
       const importedParties = Array.isArray(data) ? [] : (data.parties || []);
+      createSnapshot('before-import', cases, parties);
       setCases(importedCases);
       setParties(importedParties);
     } catch {
