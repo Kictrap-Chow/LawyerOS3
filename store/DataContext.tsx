@@ -119,6 +119,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const hasAnyData = (nextCases: Case[], nextParties: Party[]) => nextCases.length > 0 || nextParties.length > 0;
+  const latestLocalDataTs = (nextCases: Case[]) => {
+    let latest = 0;
+    for (const item of nextCases) {
+      const ts = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
+      if (Number.isFinite(ts) && ts > latest) latest = ts;
+    }
+    return latest;
+  };
 
   const createSnapshot = useCallback((reason: string, nextCases: Case[], nextParties: Party[]) => {
     if (!hasAnyData(nextCases, nextParties)) return;
@@ -301,6 +309,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSyncError('已阻止空数据覆盖云端。请先从备份恢复或确认账号后再操作。');
           return;
         }
+      }
+
+      // Freshness guard: do not allow older local data to overwrite newer cloud data.
+      const [remoteCaseLatestRes, remotePartyLatestRes] = await Promise.all([
+        supabase.from('cases').select('updated_at').eq('owner_id', ownerId).order('updated_at', { ascending: false }).limit(1),
+        supabase.from('parties').select('updated_at').eq('owner_id', ownerId).order('updated_at', { ascending: false }).limit(1),
+      ]);
+      if (remoteCaseLatestRes.error) throw remoteCaseLatestRes.error;
+      if (remotePartyLatestRes.error) throw remotePartyLatestRes.error;
+
+      const remoteCaseTs = remoteCaseLatestRes.data?.[0]?.updated_at ? new Date(remoteCaseLatestRes.data[0].updated_at).getTime() : 0;
+      const remotePartyTs = remotePartyLatestRes.data?.[0]?.updated_at ? new Date(remotePartyLatestRes.data[0].updated_at).getTime() : 0;
+      const remoteLatest = Math.max(remoteCaseTs || 0, remotePartyTs || 0);
+      const localLatest = latestLocalDataTs(nextCases);
+
+      if (remoteLatest > 0 && localLatest > 0 && localLatest + 1000 < remoteLatest) {
+        setSyncStatus('error');
+        setSyncError('已阻止旧本地数据覆盖较新的云端数据。请先从云端拉取或确认后再处理。');
+        return;
       }
 
       const { error: caseUpsertError } = await supabase.from('cases').upsert(
