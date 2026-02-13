@@ -146,6 +146,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setParties(nextParties);
   };
 
+  const loadFromServerFile = useCallback(async () => {
+    try {
+      const res = await fetch('/api/data');
+      if (!res.ok) return false;
+      const data = await res.json();
+      const nextCases = Array.isArray(data?.cases) ? data.cases.map(normalizeCase) : [];
+      const nextParties = Array.isArray(data?.parties) ? data.parties : [];
+      applyDataset(nextCases, nextParties, false);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const loadFromLocal = useCallback(() => {
+    const savedCases = parseLocalList<Case>(APP_KEY_CASES).map(normalizeCase);
+    const savedParties = parseLocalList<Party>(APP_KEY_PARTIES);
+    const savedTitle = localStorage.getItem(APP_KEY_TITLE);
+    setCases(savedCases);
+    setParties(savedParties);
+    if (savedTitle !== null) setAppTitleState(savedTitle);
+  }, []);
+
   const loadFromSupabase = useCallback(async (ownerId: string) => {
     if (!supabase || !ownerId) return false;
     try {
@@ -183,29 +206,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
   }, [loadFromLocal]);
-
-  const loadFromServerFile = useCallback(async () => {
-    try {
-      const res = await fetch('/api/data');
-      if (!res.ok) return false;
-      const data = await res.json();
-      const nextCases = Array.isArray(data?.cases) ? data.cases.map(normalizeCase) : [];
-      const nextParties = Array.isArray(data?.parties) ? data.parties : [];
-      applyDataset(nextCases, nextParties, false);
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
-
-  const loadFromLocal = useCallback(() => {
-    const savedCases = parseLocalList<Case>(APP_KEY_CASES).map(normalizeCase);
-    const savedParties = parseLocalList<Party>(APP_KEY_PARTIES);
-    const savedTitle = localStorage.getItem(APP_KEY_TITLE);
-    setCases(savedCases);
-    setParties(savedParties);
-    if (savedTitle !== null) setAppTitleState(savedTitle);
-  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
