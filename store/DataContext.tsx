@@ -37,6 +37,8 @@ interface DataContextType {
   authLoading: boolean;
   isAuthenticated: boolean;
   userEmail: string | null;
+  syncMode: 'local' | 'online';
+  setSyncMode: (mode: 'local' | 'online') => void;
   signIn: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   signUp: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   signOut: () => Promise<void>;
@@ -62,8 +64,8 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 const APP_KEY_CASES = 'lawyerCases_v18';
 const APP_KEY_PARTIES = 'lawyerParties_v18';
-const APP_KEY_TITLE = 'lawyerAppTitle_v18';
 const APP_KEY_SNAPSHOTS = 'lawyerDataSnapshots_v1';
+const APP_KEY_SYNC_MODE = 'lawyerSyncMode_v1';
 const SNAPSHOT_KEEP = 12;
 const DEFAULT_APP_TITLE = 'Legal Nice OS by Disorder Tangerine';
 
@@ -117,6 +119,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isBootstrapped, setIsBootstrapped] = useState(false);
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [authUser, setAuthUser] = useState<User | null>(null);
+  const [syncMode, setSyncModeState] = useState<'local' | 'online'>(() => {
+    const saved = localStorage.getItem(APP_KEY_SYNC_MODE);
+    if (saved === 'local' || saved === 'online') return saved;
+    return 'local';
+  });
   const [localFileSyncEnabled, setLocalFileSyncEnabledState] = useState(getLocalFileSyncEnabled());
   const [localFileSyncFileName, setLocalFileSyncFileName] = useState<string | null>(null);
   const [localFileSyncMessage, setLocalFileSyncMessage] = useState<string | null>(null);
@@ -132,6 +139,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activeView, setActiveView] = useState<'dashboard' | 'parties' | 'archives' | 'case' | 'settings'>('dashboard');
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [activeCaseTab, setActiveCaseTab] = useState<'info' | 'procedure' | 'tasks' | 'schedule' | 'reminders' | 'deadlines' | 'logs' | 'trash'>('info');
+
+  const setSyncMode = (mode: 'local' | 'online') => {
+    setSyncModeState(mode);
+    localStorage.setItem(APP_KEY_SYNC_MODE, mode);
+    if (mode === 'local') {
+      setSyncError(null);
+    }
+  };
+
+  useEffect(() => {
+    if (syncMode === 'local') {
+      setSyncStatus(localFileSyncEnabled ? 'online' : 'offline');
+      setSyncError(null);
+    }
+  }, [localFileSyncEnabled, syncMode]);
 
   const navigate = (
     view: 'dashboard' | 'parties' | 'archives' | 'case' | 'settings',
@@ -200,16 +222,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadFromLocal = useCallback(() => {
     const savedCases = parseLocalList<Case>(APP_KEY_CASES).map(normalizeCase);
     const savedParties = parseLocalList<Party>(APP_KEY_PARTIES);
-    const savedTitle = localStorage.getItem(APP_KEY_TITLE);
     setCases(savedCases);
     setParties(savedParties);
-    if (savedTitle !== null) {
-      if (savedTitle === '⚖️ LawyerOS' || savedTitle === 'LawyerOS') {
-        setAppTitleState(DEFAULT_APP_TITLE);
-      } else {
-        setAppTitleState(savedTitle);
-      }
-    }
+    setAppTitleState(DEFAULT_APP_TITLE);
   }, []);
 
   const pullFromBoundLocalFile = useCallback(async () => {
@@ -244,8 +259,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLocalFileSyncFileName(handle.name || 'backup.json');
     localFileHandleRef.current = handle;
     setLocalFileSyncMessage(`已绑定 ${handle.name || 'JSON'}，后续将自动同步`);
+    if (syncMode === 'local') {
+      setSyncStatus('online');
+      setSyncError(null);
+    }
     return { ok: true, message: '本地自动同步已启用。' };
-  }, []);
+  }, [syncMode]);
 
   const setupLocalFileSyncByExport = useCallback(async () => {
     if (!localFileSyncSupported) return { ok: false, message: '当前浏览器不支持自动本地同步。' };
@@ -280,7 +299,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLocalFileSyncMessage('已关闭本地自动同步。');
     localFileHandleRef.current = null;
     await clearBoundFileHandle();
-  }, []);
+    if (syncMode === 'local') {
+      setSyncStatus('offline');
+    }
+  }, [syncMode]);
 
   const loadFromSupabase = useCallback(async (ownerId: string) => {
     if (!supabase || !ownerId) return false;
@@ -321,6 +343,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [loadFromLocal]);
 
   useEffect(() => {
+    if (syncMode !== 'online') {
+      setAuthLoading(false);
+      setAuthUser(null);
+      return;
+    }
     if (!isSupabaseConfigured || !supabase) {
       setAuthLoading(false);
       return;
@@ -343,41 +370,41 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mounted = false;
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [syncMode]);
 
   useEffect(() => {
     const bootstrap = async () => {
-      const savedTitle = localStorage.getItem(APP_KEY_TITLE);
-      if (savedTitle !== null) {
-        if (savedTitle === '⚖️ LawyerOS' || savedTitle === 'LawyerOS') {
-          setAppTitleState(DEFAULT_APP_TITLE);
-        } else {
-          setAppTitleState(savedTitle);
-        }
-      }
+      setAppTitleState(DEFAULT_APP_TITLE);
+      localStorage.removeItem('lawyerAppTitle_v18');
 
-      if (localFileSyncSupported && getLocalFileSyncEnabled()) {
-        const handle = await getBoundFileHandle();
-        if (handle) {
-          localFileHandleRef.current = handle;
-          setLocalFileSyncEnabledState(true);
-          setLocalFileSyncFileName(handle.name || 'backup.json');
-          const pulled = await pullFromBoundLocalFile();
-          if (pulled.ok) {
-            setSyncStatus('online');
-            setSyncError(null);
-            setIsBootstrapped(true);
-            return;
+      if (syncMode === 'local') {
+        if (localFileSyncSupported && getLocalFileSyncEnabled()) {
+          const handle = await getBoundFileHandle();
+          if (handle) {
+            localFileHandleRef.current = handle;
+            setLocalFileSyncEnabledState(true);
+            setLocalFileSyncFileName(handle.name || 'backup.json');
+            const pulled = await pullFromBoundLocalFile();
+            if (pulled.ok) {
+              setSyncStatus('online');
+              setSyncError(null);
+              setIsBootstrapped(true);
+              return;
+            }
+            setSyncStatus('error');
+            setSyncError(pulled.message);
+          } else {
+            setLocalFileSyncEnabled(false);
+            setLocalFileSyncEnabledState(false);
           }
-          setSyncStatus('error');
-          setSyncError(pulled.message);
-        } else {
-          setLocalFileSyncEnabled(false);
-          setLocalFileSyncEnabledState(false);
         }
+        loadFromLocal();
+        setSyncStatus(localFileSyncEnabled ? 'online' : 'offline');
+        setIsBootstrapped(true);
+        return;
       }
 
-      if (isSupabaseConfigured && supabase) {
+      if (isSupabaseConfigured && supabase && syncMode === 'online') {
         if (authLoading) return;
         if (!authUser?.id) {
           // Keep local data visible when signed out; only disable cloud sync.
@@ -403,7 +430,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     void bootstrap();
-  }, [authLoading, authUser?.id, loadFromLocal, loadFromServerFile, loadFromSupabase, localFileSyncSupported, pullFromBoundLocalFile]);
+  }, [authLoading, authUser?.id, loadFromLocal, loadFromServerFile, loadFromSupabase, localFileSyncEnabled, localFileSyncSupported, pullFromBoundLocalFile, syncMode]);
 
   const saveToServerFile = useCallback(async (nextCases: Case[], nextParties: Party[]) => {
     try {
@@ -546,22 +573,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = window.setTimeout(() => {
-      void syncToSupabase(cases, parties, authUser?.id || null);
-    }, 450);
+    if (syncMode === 'online') {
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = window.setTimeout(() => {
+        void syncToSupabase(cases, parties, authUser?.id || null);
+      }, 450);
+    } else {
+      void saveToServerFile(cases, parties);
+    }
 
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
       if (localFileSaveTimerRef.current) window.clearTimeout(localFileSaveTimerRef.current);
     };
-  }, [cases, parties, syncToSupabase, isBootstrapped, authUser?.id, createSnapshot, localFileSyncEnabled, localFileSyncSupported]);
+  }, [cases, parties, syncToSupabase, isBootstrapped, authUser?.id, createSnapshot, localFileSyncEnabled, localFileSyncSupported, saveToServerFile, syncMode]);
 
   useEffect(() => {
-    localStorage.setItem(APP_KEY_TITLE, appTitle);
-  }, [appTitle]);
-
-  useEffect(() => {
+    if (syncMode !== 'online') return;
     if (!supabase || !isSupabaseConfigured) return;
 
     if (!authUser?.id) return;
@@ -583,9 +611,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
       void supabase.removeChannel(channel);
     };
-  }, [authUser?.id, loadFromSupabase]);
+  }, [authUser?.id, loadFromSupabase, syncMode]);
 
   const signIn = async (email: string, password: string) => {
+    if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请切换到联网模式后登录。' };
     if (!supabase) return { ok: false, message: '云端同步未配置。' };
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { ok: false, message: error.message };
@@ -593,6 +622,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string) => {
+    if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请切换到联网模式后注册。' };
     if (!supabase) return { ok: false, message: '云端同步未配置。' };
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) return { ok: false, message: error.message };
@@ -600,6 +630,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    if (syncMode !== 'online') return;
     if (!supabase) return;
     await supabase.auth.signOut();
     // Do not wipe local data on sign out; user can still view/edit locally.
@@ -608,8 +639,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const setAppTitle = (title: string) => {
-    setAppTitleState(title);
-    localStorage.setItem(APP_KEY_TITLE, title);
+    setAppTitleState(DEFAULT_APP_TITLE);
   };
 
   const updateCase = (updatedCase: Case) => {
@@ -685,10 +715,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         syncStatus,
         syncError,
         lastSyncedAt,
-        isSupabaseEnabled: isSupabaseConfigured,
+        isSupabaseEnabled: isSupabaseConfigured && syncMode === 'online',
         authLoading,
         isAuthenticated: Boolean(authUser),
         userEmail: authUser?.email || null,
+        syncMode,
+        setSyncMode,
         signIn,
         signUp,
         signOut,

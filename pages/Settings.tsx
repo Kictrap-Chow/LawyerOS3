@@ -9,7 +9,7 @@ export const Settings: React.FC = () => {
   const { lang, setLang } = useI18n();
   const { preset, setPreset, accent, setAccent, textColor, setTextColor, font, setFont } = useTheme();
   const {
-    appTitle, setAppTitle, isSupabaseEnabled, authLoading, isAuthenticated, userEmail, signIn, signUp, signOut,
+    isSupabaseEnabled, authLoading, isAuthenticated, userEmail, syncMode, setSyncMode, signIn, signUp, signOut,
     exportData, importData,
     localFileSyncSupported, localFileSyncEnabled, localFileSyncFileName, localFileSyncMessage,
     setupLocalFileSyncByExport, bindLocalFileSyncExisting, pullFromLocalFileSync, disableLocalFileSync
@@ -127,29 +127,91 @@ export const Settings: React.FC = () => {
     <div className="max-w-3xl mx-auto p-3 md:p-6 animate-fade-in">
       <div className="craft-surface p-4 md:p-6 mb-4">
         <h1 className="text-2xl font-bold text-strong-theme">设置</h1>
-        <p className="text-sm text-gray-500 mt-1">语言、强调色、文字颜色和字体都在这里调整。</p>
+        <p className="text-sm text-gray-500 mt-1">Legal Nice OS by Disorder Tangerine</p>
       </div>
 
       <div className="craft-panel p-4 md:p-5 mb-4">
-        <h2 className="text-sm font-semibold tint-text uppercase mb-3">系统</h2>
-        <label className="block text-xs tint-text mb-1">系统名称</label>
-        <input
-          className="w-full text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
-          value={appTitle}
-          onChange={(e) => setAppTitle(e.target.value)}
-          placeholder="请输入系统名称"
-        />
-      </div>
-
-      <div className="craft-panel p-4 md:p-5 mb-4">
-        <h2 className="text-sm font-semibold tint-text uppercase mb-3">账号与同步</h2>
-        {!isSupabaseEnabled && (
+        <h2 className="text-sm font-semibold tint-text uppercase mb-3">登录方式</h2>
+        <div className="flex items-center gap-2 mb-3">
+          <button
+            className={cn(
+              "px-3 py-1.5 text-sm rounded-lg border",
+              syncMode === 'local' ? 'bg-[#1f293b] text-white border-[#1f293b]' : 'bg-white/80 border-gray-200 text-[var(--ui-text-strong)]'
+            )}
+            onClick={() => setSyncMode('local')}
+          >
+            本地（iCloud）
+          </button>
+          <button
+            className={cn(
+              "px-3 py-1.5 text-sm rounded-lg border",
+              syncMode === 'online' ? 'bg-[#1f293b] text-white border-[#1f293b]' : 'bg-white/80 border-gray-200 text-[var(--ui-text-strong)]'
+            )}
+            onClick={() => setSyncMode('online')}
+          >
+            联网（Supabase）
+          </button>
+        </div>
+        {syncMode === 'local' && (
+          <div className="space-y-3">
+            <div className="text-sm text-gray-600">
+              当前为本地优先模式：自动使用 iCloud JSON，同步时暂不走 Supabase。
+            </div>
+            <div className="rounded-xl border border-[var(--ui-line)] bg-white/50 p-3">
+              <div className="text-xs text-gray-500 mb-2">
+                首次先“导出并绑定 iCloud 文件”，之后每次打开页面会自动拉取，且每次修改会自动写回同一个 JSON。
+              </div>
+              {!localFileSyncSupported && (
+                <div className="text-xs text-[#8b6b4e] mb-2">
+                  当前浏览器不支持自动本地同步。请改用最新版 Chrome / Edge / Safari（iOS 17+）。
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleSetupLocalSync}
+                  disabled={syncMode !== 'local' || !localFileSyncSupported || localSyncBusy}
+                  className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+                >
+                  首次导出并绑定 iCloud 文件
+                </button>
+                <button
+                  onClick={handleBindExisting}
+                  disabled={syncMode !== 'local' || !localFileSyncSupported || localSyncBusy}
+                  className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+                >
+                  绑定已有 iCloud JSON
+                </button>
+                <button
+                  onClick={handlePullNow}
+                  disabled={syncMode !== 'local' || !localFileSyncEnabled || localSyncBusy}
+                  className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+                >
+                  立即拉取一次
+                </button>
+                <button
+                  onClick={handleDisableLocalSync}
+                  disabled={syncMode !== 'local' || !localFileSyncEnabled || localSyncBusy}
+                  className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+                >
+                  关闭自动同步
+                </button>
+              </div>
+              <div className="mt-2 text-xs text-[#6a7d93]">
+                状态：{syncMode === 'local' ? (localFileSyncEnabled ? `已启用（${localFileSyncFileName || '未命名文件'}）` : '未启用') : '当前为联网模式'}
+              </div>
+              {(localSyncActionMessage || localFileSyncMessage) && (
+                <div className="mt-1 text-xs text-[#6a7d93]">{localSyncActionMessage || localFileSyncMessage}</div>
+              )}
+            </div>
+          </div>
+        )}
+        {syncMode === 'online' && !isSupabaseEnabled && (
           <div className="text-sm text-gray-500">当前未配置云端同步环境变量，在线同步不可用。</div>
         )}
-        {isSupabaseEnabled && authLoading && (
+        {syncMode === 'online' && isSupabaseEnabled && authLoading && (
           <div className="text-sm text-gray-500">正在检查登录状态...</div>
         )}
-        {isSupabaseEnabled && !authLoading && !isAuthenticated && (
+        {syncMode === 'online' && isSupabaseEnabled && !authLoading && !isAuthenticated && (
           <div className="space-y-2">
             <form
               className="space-y-2"
@@ -184,7 +246,7 @@ export const Settings: React.FC = () => {
             {authMessage && <div className="text-xs text-gray-500">{authMessage}</div>}
           </div>
         )}
-        {isSupabaseEnabled && !authLoading && isAuthenticated && (
+        {syncMode === 'online' && isSupabaseEnabled && !authLoading && isAuthenticated && (
           <div className="space-y-2">
             <div className="text-sm text-gray-600">当前登录：<span className="font-medium text-strong-theme">{userEmail}</span></div>
             <button disabled={authBusy} onClick={handleSignOut} className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60">退出登录</button>
@@ -199,7 +261,7 @@ export const Settings: React.FC = () => {
           <button
             className={cn(
               "min-w-[64px] px-3 py-1.5 text-sm rounded-lg border",
-              lang === 'zh' ? 'accent-bg text-white accent-border' : 'bg-white/80 border-gray-200'
+              lang === 'zh' ? 'bg-[#1f293b] text-white border-[#1f293b]' : 'bg-white/80 border-gray-200 text-[var(--ui-text-strong)]'
             )}
             onClick={() => setLang('zh')}
           >
@@ -208,7 +270,7 @@ export const Settings: React.FC = () => {
           <button
             className={cn(
               "min-w-[64px] px-3 py-1.5 text-sm rounded-lg border",
-              lang === 'en' ? 'accent-bg text-white accent-border' : 'bg-white/80 border-gray-200'
+              lang === 'en' ? 'bg-[#1f293b] text-white border-[#1f293b]' : 'bg-white/80 border-gray-200 text-[var(--ui-text-strong)]'
             )}
             onClick={() => setLang('en')}
           >
@@ -291,54 +353,6 @@ export const Settings: React.FC = () => {
             导入数据
           </button>
         </div>
-      </div>
-
-      <div className="craft-panel p-4 md:p-5 mb-4">
-        <h2 className="text-sm font-semibold tint-text uppercase mb-3">本地 JSON 同步（iCloud 友好）</h2>
-        <div className="text-xs text-gray-500 mb-2">
-          建议首次先“导出并绑定 iCloud 文件”，之后每次打开页面会自动拉取，且每次修改会自动写回同一个 JSON。
-        </div>
-        {!localFileSyncSupported && (
-          <div className="text-xs text-[#8b6b4e] mb-2">
-            当前浏览器不支持自动本地同步。请改用最新版 Chrome / Edge / Safari（iOS 17+）。
-          </div>
-        )}
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={handleSetupLocalSync}
-            disabled={!localFileSyncSupported || localSyncBusy}
-            className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
-          >
-            首次导出并绑定 iCloud 文件
-          </button>
-          <button
-            onClick={handleBindExisting}
-            disabled={!localFileSyncSupported || localSyncBusy}
-            className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
-          >
-            绑定已有 iCloud JSON
-          </button>
-          <button
-            onClick={handlePullNow}
-            disabled={!localFileSyncEnabled || localSyncBusy}
-            className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
-          >
-            立即拉取一次
-          </button>
-          <button
-            onClick={handleDisableLocalSync}
-            disabled={!localFileSyncEnabled || localSyncBusy}
-            className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
-          >
-            关闭自动同步
-          </button>
-        </div>
-        <div className="mt-2 text-xs text-[#6a7d93]">
-          状态：{localFileSyncEnabled ? `已启用（${localFileSyncFileName || '未命名文件'}）` : '未启用'}
-        </div>
-        {(localSyncActionMessage || localFileSyncMessage) && (
-          <div className="mt-1 text-xs text-[#6a7d93]">{localSyncActionMessage || localFileSyncMessage}</div>
-        )}
       </div>
 
       <div className="craft-panel p-4 md:p-5 mb-4">
