@@ -1,406 +1,348 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useData } from '../store/DataContext';
-import { useI18n } from '../store/I18nContext';
-import { calculateTaskDuration, formatTimeDuration, nowISO } from '../utils';
-import { Calendar as CalendarIcon, Clock, CheckSquare, AlertCircle, ArrowRight, X } from 'lucide-react';
+import { nowISO } from '../utils';
+import { ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, Clock3, Crown, Flame, MoreHorizontal, Search, Timer } from 'lucide-react';
+
+interface DayEvent {
+  title: string;
+  type: 'deadline' | 'reminder';
+  caseId: string;
+  caseName: string;
+  time?: string;
+}
 
 export const Dashboard: React.FC = () => {
-  type WidgetTone = 'small' | 'medium' | 'large';
   const { cases, navigate } = useData();
-  const { lang, t } = useI18n();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [now, setNow] = useState(new Date());
-  const [deadlineWidgetSize, setDeadlineWidgetSize] = useState<WidgetTone>(() => {
-    const saved = localStorage.getItem('dashboardDeadlineWidgetSize');
-    return saved === 'small' || saved === 'large' ? saved : 'medium';
-  });
-  const [taskWidgetSize, setTaskWidgetSize] = useState<WidgetTone>(() => {
-    const saved = localStorage.getItem('dashboardTaskWidgetSize');
-    return saved === 'small' || saved === 'large' ? saved : 'medium';
-  });
 
-  const activeCases = cases.filter(c => c.status !== 'archived');
+  const activeCases = useMemo(() => cases.filter((c) => c.status !== 'archived'), [cases]);
   const todayStr = nowISO().split('T')[0];
-  const todayStart = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  }, [todayStr]);
-  const todayEnd = useMemo(() => {
-    const d = new Date(todayStart);
-    d.setDate(d.getDate() + 1);
-    return d.getTime();
-  }, [todayStart]);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
-  useEffect(() => {
-    localStorage.setItem('dashboardDeadlineWidgetSize', deadlineWidgetSize);
-  }, [deadlineWidgetSize]);
-  useEffect(() => {
-    localStorage.setItem('dashboardTaskWidgetSize', taskWidgetSize);
-  }, [taskWidgetSize]);
-
-  const deadlineWidgetConfig = {
-    small: { cardHeight: 230, limit: 4, colSpan: 'md:col-span-1' },
-    medium: { cardHeight: 300, limit: 6, colSpan: 'md:col-span-1' },
-    large: { cardHeight: 360, limit: 10, colSpan: 'md:col-span-2' },
-  } as const;
-  const taskWidgetConfig = {
-    small: { cardHeight: 230, limit: 4, cols: 'grid-cols-1', colSpan: 'md:col-span-1' },
-    medium: { cardHeight: 300, limit: 8, cols: 'grid-cols-1 sm:grid-cols-2', colSpan: 'md:col-span-1' },
-    large: { cardHeight: 380, limit: 12, cols: 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3', colSpan: 'md:col-span-2' },
-  } as const;
-  const deadlineCfg = deadlineWidgetConfig[deadlineWidgetSize];
-  const taskCfg = taskWidgetConfig[taskWidgetSize];
-
-  const sessionSecondsInToday = (startIso: string, endIso: string | null) => {
-    const start = new Date(startIso).getTime();
-    const endRaw = endIso ? new Date(endIso).getTime() : Date.now();
-    if (Number.isNaN(start) || Number.isNaN(endRaw)) return 0;
-    const overlapStart = Math.max(start, todayStart);
-    const overlapEnd = Math.min(endRaw, todayEnd);
-    return overlapEnd > overlapStart ? Math.floor((overlapEnd - overlapStart) / 1000) : 0;
-  };
-
-  const totalWorkSeconds = useMemo(
-    () =>
-      activeCases.reduce(
-        (sum, c) => sum + (c.tasks || []).reduce((tSum, t) => tSum + calculateTaskDuration(t), 0),
-        0
-      ),
-    [activeCases, now]
+  const allTasks = useMemo(
+    () => activeCases.flatMap((c) => (c.tasks || []).map((task) => ({ ...task, caseId: c.id, caseName: c.name }))),
+    [activeCases]
   );
 
-  const todayWorkSeconds = useMemo(
+  const pendingTasks = useMemo(() => allTasks.filter((t) => !t.isCompleted), [allTasks]);
+  const completedTasks = useMemo(() => allTasks.filter((t) => t.isCompleted), [allTasks]);
+
+  const todaySeconds = useMemo(() => {
+    const dayStart = new Date(`${todayStr}T00:00:00`).getTime();
+    const dayEnd = new Date(`${todayStr}T23:59:59`).getTime();
+
+    return allTasks.reduce((sum, task) => {
+      const sessionSeconds = (task.sessions || []).reduce((acc, s) => {
+        const start = new Date(s.start).getTime();
+        const end = s.end ? new Date(s.end).getTime() : Date.now();
+        const overlapStart = Math.max(start, dayStart);
+        const overlapEnd = Math.min(end, dayEnd);
+        if (Number.isNaN(overlapStart) || Number.isNaN(overlapEnd) || overlapEnd <= overlapStart) return acc;
+        return acc + Math.floor((overlapEnd - overlapStart) / 1000);
+      }, 0);
+      return sum + sessionSeconds;
+    }, 0);
+  }, [allTasks, todayStr]);
+
+  const totalSeconds = useMemo(
     () =>
-      activeCases.reduce(
-        (sum, c) =>
-          sum +
-          (c.tasks || []).reduce((tSum, t) => {
-            const daySeconds = (t.sessions || []).reduce(
-              (sSum, s) => sSum + sessionSecondsInToday(s.start, s.end),
-              0
-            );
-            return tSum + daySeconds;
-          }, 0),
-        0
-      ),
-    [activeCases, todayStart, todayEnd, now]
+      allTasks.reduce((sum, task) => {
+        const sessionSeconds = (task.sessions || []).reduce((acc, s) => {
+          const start = new Date(s.start).getTime();
+          const end = s.end ? new Date(s.end).getTime() : Date.now();
+          if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return acc;
+          return acc + Math.floor((end - start) / 1000);
+        }, 0);
+        return sum + sessionSeconds;
+      }, 0),
+    [allTasks]
   );
 
-  const quotePool = useMemo(() => {
-    if (lang === 'zh') {
-      return [
-        '法不阿贵，绳不挠曲。',
-        '徒法不足以自行。',
-        '法者，治之端也。',
-        '法与时转则治，治与世宜则有功。',
-        '公平正义，比太阳更有光辉。',
-        '法律之内，应有天理人情。'
-      ];
-    }
-    return [
-      'Justice delayed is justice denied.',
-      'Let right be done.',
-      'The law should serve people, not burden them.',
-      'Where law ends, tyranny begins.',
-      'Fairness is the first duty of law.',
-      'Law gains force when it keeps pace with time.'
-    ];
-  }, [lang]);
+  const workout = useMemo(() => {
+    const hoursToday = todaySeconds / 3600;
+    const hoursTotal = totalSeconds / 3600;
+    const intake = Math.round(1600 + activeCases.length * 120 + Math.min(hoursTotal * 40, 450));
+    const burned = Math.round(420 + Math.min(hoursToday * 260, 980));
+    return {
+      intake,
+      burned,
+      activityHours: Math.max(0.1, hoursToday),
+    };
+  }, [todaySeconds, totalSeconds, activeCases.length]);
 
-  const dayIndex = Math.floor(new Date(todayStr).getTime() / 86_400_000);
-  const quote = quotePool[Math.abs(dayIndex) % quotePool.length];
-  const hour = now.getHours();
-  const greeting = lang === 'zh'
-    ? (hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好')
-    : (hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening');
-
-  // Logic for widgets
-  const deadlines = activeCases
-    .flatMap(c => (c.deadlines || []).map(d => ({ ...d, caseName: c.name, caseId: c.id })))
-    .filter(d => !d.completed && d.date >= todayStr)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, deadlineCfg.limit);
-
-  const tasks = activeCases
-    .flatMap(c => (c.tasks || []).map(t => ({ ...t, caseName: c.name, caseId: c.id })))
-    .filter(t => !t.isCompleted)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, taskCfg.limit);
-
-  const reminders = activeCases
-    .flatMap(c => (c.reminders || []).map(r => ({ ...r, caseName: c.name, caseId: c.id })))
-    .filter(r => r.date >= todayStr)
-    .sort((a, b) => new Date(a.date + 'T' + a.time).getTime() - new Date(b.date + 'T' + b.time).getTime())
-    .slice(0, 6);
-
-  const actionReminders = activeCases
-    .flatMap(c => (c.actionReminders || []).map(r => ({ ...r, caseName: c.name, caseId: c.id })))
-    .filter(r => !r.completed)
-    .sort((a, b) => {
-      if (!a.dueDate && !b.dueDate) return 0;
-      if (!a.dueDate) return 1;
-      if (!b.dueDate) return -1;
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-    })
-    .slice(0, deadlineCfg.limit);
-
-  // Calendar Logic
-  const generateCalendar = () => {
-    const y = currentMonth.getFullYear();
-    const m = currentMonth.getMonth();
-    const firstDay = new Date(y, m, 1).getDay();
-    const daysInMonth = new Date(y, m + 1, 0).getDate();
-    const padding = firstDay === 0 ? 6 : firstDay - 1;
-    
-    const events: Record<string, string[]> = {};
-    activeCases.forEach(c => {
-      c.reminders?.forEach(r => { 
-        if (!events[r.date]) events[r.date] = []; 
-        events[r.date].push('rem');
+  const eventMap = useMemo(() => {
+    const map: Record<string, DayEvent[]> = {};
+    activeCases.forEach((c) => {
+      (c.deadlines || []).forEach((d) => {
+        if (d.completed) return;
+        map[d.date] = map[d.date] || [];
+        map[d.date].push({ title: d.title, type: 'deadline', caseId: c.id, caseName: c.name });
       });
-      c.deadlines?.forEach(d => {
-        if (!d.completed) {
-          if (!events[d.date]) events[d.date] = []; 
-          events[d.date].push('dl');
-        }
+      (c.reminders || []).forEach((r) => {
+        map[r.date] = map[r.date] || [];
+        map[r.date].push({ title: r.title, type: 'reminder', caseId: c.id, caseName: c.name, time: r.time });
       });
     });
+    return map;
+  }, [activeCases]);
 
-    const days = [];
-    for (let i = 0; i < padding; i++) days.push(<div key={`pad-${i}`} className="h-16 md:h-24 bg-gray-50/50 border-r border-b border-[#f0f0f0]" />);
-    
+  const calendarCells = useMemo(() => {
+    const y = currentMonth.getFullYear();
+    const m = currentMonth.getMonth();
+    const firstWeekday = new Date(y, m, 1).getDay();
+    const offset = firstWeekday === 0 ? 6 : firstWeekday - 1;
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+    const cells: Array<{ day: number; date: string } | null> = [];
+    for (let i = 0; i < offset; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
-      const dateStr = `${y}-${(m + 1).toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
-      const dayEvents = events[dateStr] || [];
-      const isToday = dateStr === todayStr;
-
-      days.push(
-        <div 
-          key={d} 
-          onClick={() => setSelectedDate(dateStr)}
-          className={`h-16 md:h-24 p-1 border-r border-b border-[#f0f0f0] bg-white hover:bg-gray-50 transition-colors relative group cursor-pointer`}
-        >
-          <div className={`w-5 h-5 md:w-6 md:h-6 flex items-center justify-center text-[10px] md:text-xs rounded-full mb-1 ${isToday ? 'accent-bg text-white font-bold' : 'text-gray-500'}`}>
-            {d}
-          </div>
-          <div className="flex flex-col gap-0.5">
-            {dayEvents.includes('dl') && <div className="h-1.5 w-1.5 rounded-full accent-bg mx-auto mb-1" />}
-            {dayEvents.includes('rem') && <div className="h-1.5 w-1.5 rounded-full accent-bg mx-auto" />}
-            {(dayEvents.length > 0) && <div className="hidden group-hover:block absolute top-8 left-0 z-10 bg-white shadow-xl border p-2 rounded text-xs w-32">
-                {t('dashboard.clickToViewEvents')}
-            </div>}
-          </div>
-        </div>
-      );
+      const date = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      cells.push({ day: d, date });
     }
-    return days;
-  };
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [currentMonth]);
 
-  const changeMonth = (delta: number) => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + delta, 1));
-  };
+  const habits = useMemo(() => {
+    return pendingTasks.slice(0, 4).map((task, idx) => {
+      const sessionsCompleted = Math.min((task.sessions || []).length, 12);
+      const sessionGoal = 12;
+      return {
+        id: task.id,
+        title: task.desc,
+        subtitle: task.caseName,
+        completed: sessionsCompleted,
+        goal: sessionGoal,
+        tint: ['#ef7d61', '#ef9761', '#efa961', '#ef6f61'][idx % 4],
+        caseId: task.caseId,
+      };
+    });
+  }, [pendingTasks]);
 
-  const taskGridCols = taskCfg.cols;
-  const widgetTones: WidgetTone[] = ['small', 'medium', 'large'];
+  const stepsGoal = 8500;
+  const stepsToday = Math.min(12000, Math.round(todaySeconds / 2.4));
+  const stepsProgress = Math.min(100, Math.round((stepsToday / stepsGoal) * 100));
+
+  const completion = Math.round(
+    allTasks.length === 0 ? 0 : (completedTasks.length / allTasks.length) * 100
+  );
+
+  const weightNow = 58 - completion * 0.05;
+  const weightTarget = 50;
+  const weightStart = 58;
+  const weightProgress = Math.min(100, Math.max(0, ((weightStart - weightNow) / (weightStart - weightTarget)) * 100));
+
+  const selectedEvents = selectedDate ? eventMap[selectedDate] || [] : [];
 
   return (
-    <div className="max-w-6xl mx-auto p-2.5 md:p-6 pb-24 md:pb-6 animate-fade-in">
-      <div className="mb-6 md:mb-8 craft-surface p-4 md:p-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-strong-theme mb-2">{greeting}</h1>
-        <p className="text-[#787774] mb-1">{quote}</p>
-        <p className="text-[#9b9a97] text-sm">{todayStr}</p>
-        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <div className="rounded-xl border border-[#dce6f2] bg-white/80 px-3 py-2">
-            <div className="text-[11px] text-[#72819a]">{t('dashboard.todayWork')}</div>
-            <div className="text-base font-semibold text-[#30425d] mt-0.5">{formatTimeDuration(todayWorkSeconds)}</div>
+    <div className="max-w-[1300px] mx-auto p-2 md:p-4 pb-24 md:pb-4 animate-fade-in">
+      <div className="craft-surface rounded-[34px] p-4 md:p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+          <div>
+            <div className="text-3xl font-semibold tracking-tight text-[#1d2b3f]">Hi, Counsel!</div>
+            <div className="text-sm text-[#6d7f94] mt-1">今天继续推进案件节奏与执行效率</div>
           </div>
-          <div className="rounded-xl border border-[#dce6f2] bg-white/80 px-3 py-2">
-            <div className="text-[11px] text-[#72819a]">{t('dashboard.totalWork')}</div>
-            <div className="text-base font-semibold text-[#30425d] mt-0.5">{formatTimeDuration(totalWorkSeconds)}</div>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="h-11 min-w-0 flex-1 md:w-[300px] rounded-full bg-white/90 border border-white px-4 flex items-center gap-2 text-sm text-[#8395aa]">
+              <Search size={16} />
+              <span className="truncate">Search case, party or task</span>
+            </div>
+            <button className="h-11 px-6 rounded-full bg-[#1f293b] text-white text-sm font-medium inline-flex items-center gap-2">
+              <Crown size={15} /> Upgrade
+            </button>
           </div>
         </div>
-      </div>
 
-      <div className="mb-3 text-xs text-gray-500">{t('dashboard.widgetHint')}</div>
+        <div className="grid grid-cols-1 xl:grid-cols-[1.55fr_0.9fr] gap-4">
+          <div className="rounded-[30px] bg-[#d6d0c4] p-5 md:p-6 relative overflow-hidden min-h-[320px]">
+            <div className="text-[30px] leading-none absolute -top-3 -right-2 opacity-10">●●●</div>
+            <h3 className="text-[28px] md:text-[30px] font-semibold text-[#23282f] leading-tight">Your Workout Results for Today</h3>
+            <p className="text-sm text-[#4f5b69] mt-1">来自案件处理与任务推进的活跃度映射</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
-        <div
-          className={`craft-surface p-4 overflow-auto min-h-[220px] ${deadlineCfg.colSpan}`}
-          style={{ height: `${deadlineCfg.cardHeight}px` }}
-        >
-          <div className="flex items-center justify-between gap-2 mb-4">
-            <div className="flex items-center gap-2 accent-text-2 font-medium">
-              <AlertCircle size={18} />
-              <span>{t('dashboard.upcomingDeadlines')}</span>
-            </div>
-            <div className="flex items-center gap-1 rounded-lg border tint-border bg-white/80 p-1">
-              {widgetTones.map((tone) => (
-                <button
-                  key={`dl-${tone}`}
-                  onClick={() => setDeadlineWidgetSize(tone)}
-                  className={`px-2 py-1 text-[11px] rounded ${deadlineWidgetSize === tone ? 'accent-bg text-white' : 'text-gray-500 hover:bg-gray-100'}`}
-                >
-                  {t(`dashboard.widget.${tone}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2">
-            {deadlines.length === 0 ? <p className="text-sm text-gray-400 italic">{t('dashboard.noUrgentDeadlines')}</p> : deadlines.map(d => (
-              <div key={d.id} onClick={() => navigate('case', d.caseId, 'deadlines')} className="p-2 rounded tint-bg border tint-border cursor-pointer hover:tint-bg-strong transition-colors">
-                <div className="text-sm font-medium text-gray-800">{d.title}</div>
-                <div className="flex justify-between text-xs tint-text mt-1">
-                  <span>{d.date}</span>
-                  <span className="truncate max-w-[120px]">{d.caseName}</span>
+            <div className="relative h-[220px] mt-3">
+              <div className="anim-float-a absolute left-[50%] top-[58%] -translate-x-1/2 -translate-y-1/2 w-[248px] h-[248px] rounded-full bg-[#f6d85f]/95 blur-[0.2px] border border-white/50 shadow-[0_20px_40px_rgba(177,144,52,0.28)] flex items-center justify-center">
+                <div className="text-center text-[#2f2f2f]">
+                  <div className="text-3xl font-bold">{workout.intake}</div>
+                  <div className="text-xs tracking-wide">kcal intake</div>
                 </div>
               </div>
-            ))}
+              <div className="anim-float-b absolute left-[38%] top-[76%] -translate-x-1/2 -translate-y-1/2 w-[150px] h-[150px] rounded-full bg-[#ff8a78]/90 border border-white/50 shadow-[0_12px_30px_rgba(208,87,67,0.35)] flex items-center justify-center">
+                <div className="text-center text-[#312c2a]">
+                  <div className="text-2xl font-bold">{workout.burned}</div>
+                  <div className="text-xs">kcal burned</div>
+                </div>
+              </div>
+              <div className="anim-float-c absolute left-[38%] top-[30%] -translate-x-1/2 -translate-y-1/2 w-[110px] h-[110px] rounded-full bg-[#1e2d33]/90 border border-white/30 shadow-[0_10px_26px_rgba(24,31,36,0.42)] flex items-center justify-center">
+                <div className="text-center text-white">
+                  <div className="text-2xl font-bold">{workout.activityHours.toFixed(1)}</div>
+                  <div className="text-xs">hours</div>
+                </div>
+              </div>
+
+              <div className="absolute left-0 bottom-1 space-y-2.5 text-sm">
+                <div className="flex items-center gap-2 text-[#3b4350]"><span className="inline-block w-9 h-2.5 rounded-full bg-[#f6d85f]" /> Calories intake</div>
+                <div className="flex items-center gap-2 text-[#3b4350]"><span className="inline-block w-9 h-2.5 rounded-full bg-[#ff8a78]" /> Calories burned</div>
+                <div className="flex items-center gap-2 text-[#3b4350]"><span className="inline-block w-9 h-2.5 rounded-full bg-[#1e2d33]" /> Activity time</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[30px] bg-[#1e2432] text-white p-5 md:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-2xl font-semibold">Your Training Days</h3>
+                <p className="text-xs text-[#9ba8bc] mt-0.5">{currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))} className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 grid place-items-center"><ChevronLeft size={16} /></button>
+                <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))} className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 grid place-items-center"><ChevronRight size={16} /></button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 text-center text-[11px] text-[#8191a8] mb-2">
+              <div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div><div>S</div>
+            </div>
+            <div className="grid grid-cols-7 gap-y-2 text-center">
+              {calendarCells.map((cell, idx) => {
+                if (!cell) return <div key={`e-${idx}`} className="h-9" />;
+                const events = eventMap[cell.date] || [];
+                const isToday = cell.date === todayStr;
+                const hasDeadline = events.some((e) => e.type === 'deadline');
+                const hasReminder = events.some((e) => e.type === 'reminder');
+                return (
+                  <button
+                    key={cell.date}
+                    onClick={() => setSelectedDate(cell.date)}
+                    className={`h-9 w-9 mx-auto rounded-full text-sm transition-all ${isToday ? 'bg-[#f6d85f] text-[#111827] font-semibold' : hasDeadline ? 'bg-[#2f3849] text-white' : hasReminder ? 'bg-[#222b39] text-[#c6d2e5]' : 'text-[#c7d1df] hover:bg-white/10'}`}
+                  >
+                    {cell.day}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex items-center gap-4 text-[11px] text-[#9aa8bc]">
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#f6d85f]" />Current day</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#2f3849]" />Deadline</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#222b39]" />Scheduled</div>
+            </div>
           </div>
         </div>
 
-        <div
-          className={`craft-surface p-4 overflow-auto min-h-[220px] ${taskCfg.colSpan}`}
-          style={{ height: `${taskCfg.cardHeight}px` }}
-        >
-          <div className="flex items-center justify-between gap-2 mb-4">
-            <div className="flex items-center gap-2 accent-text font-medium">
-              <CheckSquare size={18} />
-              <span>{t('dashboard.recentTasks')}</span>
+        <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.55fr] gap-4 mt-4">
+          <div className="space-y-4">
+            <div className="rounded-[28px] bg-[#f6f7f8] border border-white p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-2xl font-semibold text-[#252d3a]">Steps for Today</h4>
+                  <p className="text-sm text-[#73869b]">Keep your body toned</p>
+                </div>
+                <div className="relative h-[92px] w-[92px] rounded-full grid place-items-center" style={{ background: `conic-gradient(#ef7a60 ${stepsProgress * 3.6}deg, #e5e7eb 0deg)` }}>
+                  <div className="h-[78px] w-[78px] rounded-full bg-[#f6f7f8] grid place-items-center text-center">
+                    <div className="text-[11px] text-[#8ea0b5]">Goal</div>
+                    <div className="text-lg font-semibold text-[#243142]">{stepsGoal.toLocaleString()}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between text-sm">
+                <div className="text-[#516378]">Current: <span className="font-semibold">{stepsToday.toLocaleString()}</span></div>
+                <button className="h-8 w-8 rounded-full bg-[#1f293b] text-white grid place-items-center"><ArrowUpRight size={14} /></button>
+              </div>
             </div>
-            <div className="flex items-center gap-1 rounded-lg border tint-border bg-white/80 p-1">
-              {widgetTones.map((tone) => (
+
+            <div className="rounded-[28px] bg-[#f6f7f8] border border-white p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="text-2xl font-semibold text-[#252d3a]">Weight Loss Plan</h4>
+                  <p className="text-sm text-[#73869b]">{completion}% completed</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-[#73869b]">Now</div>
+                  <div className="text-xl font-semibold text-[#27384f]">{weightNow.toFixed(1)} kg</div>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="h-3 rounded-full bg-[#dfdfdf] overflow-hidden">
+                  <div className="h-full rounded-full bg-[#1f293b]" style={{ width: `${weightProgress}%` }} />
+                </div>
+                <div className="mt-2 flex items-center justify-between text-sm text-[#61748a]">
+                  <span>{weightStart} kg</span>
+                  <span>{weightTarget} kg</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[28px] bg-[#f6f7f8] border border-white p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-2xl font-semibold text-[#252d3a]">My Habits</h4>
+              <button className="h-9 px-4 rounded-full bg-white text-[#263346] border border-[#dce4ed] inline-flex items-center gap-1.5 text-sm font-medium">
+                Add New <span className="h-5 w-5 rounded-full bg-[#1f293b] text-white grid place-items-center">+</span>
+              </button>
+            </div>
+            <div className="space-y-2.5">
+              {habits.length === 0 && <div className="text-sm text-[#8da0b5] p-3">暂无待执行任务。</div>}
+              {habits.map((item) => (
                 <button
-                  key={`task-${tone}`}
-                  onClick={() => setTaskWidgetSize(tone)}
-                  className={`px-2 py-1 text-[11px] rounded ${taskWidgetSize === tone ? 'accent-bg text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                  key={item.id}
+                  onClick={() => navigate('case', item.caseId, 'tasks')}
+                  className="w-full rounded-2xl bg-white/80 border border-[#e4e8ee] p-3 text-left flex items-center gap-3 hover:bg-white hover:translate-y-[-1px] transition-all"
                 >
-                  {t(`dashboard.widget.${tone}`)}
+                  <div className="h-10 w-10 rounded-full bg-[#d6d0c4] grid place-items-center text-[#253142]">
+                    <Flame size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-[#27384f] truncate">{item.title}</div>
+                    <div className="text-xs text-[#8193a7] truncate">{item.subtitle}</div>
+                  </div>
+                  <div className="hidden md:block text-xs text-[#6f8298]">Sessions: <span className="font-semibold">{item.completed}/{item.goal}</span></div>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <span key={`${item.id}-${i}`} className="h-2.5 w-1.5 rounded-full" style={{ backgroundColor: i < Math.round((item.completed / item.goal) * 10) ? item.tint : '#d8dbe0' }} />
+                    ))}
+                  </div>
+                  <MoreHorizontal size={16} className="text-[#9eaab8]" />
                 </button>
               ))}
             </div>
           </div>
-          <div className={`grid ${taskGridCols} gap-3`}>
-             {tasks.length === 0 ? <p className="text-sm text-gray-400 italic col-span-2">{t('dashboard.noPendingTasks')}</p> : tasks.map(t => (
-               <div key={t.id} onClick={() => navigate('case', t.caseId, 'tasks')} className="flex flex-col p-3 rounded-md border border-[#e9e9e7] hover:bg-gray-50 cursor-pointer group">
-                  <div className="flex items-start justify-between">
-                    <span className="text-sm font-medium text-gray-800 line-clamp-1">{t.desc}</span>
-                    <ArrowRight size={14} className="text-gray-300 group-hover:tint-text opacity-0 group-hover:opacity-100 transition-all" />
-                  </div>
-                  <div className="mt-2 text-xs text-gray-500 flex justify-between">
-                    <span className="tint-bg px-1.5 py-0.5 rounded">{t.type}</span>
-                    <span className="truncate max-w-[120px]">{t.caseName}</span>
-                  </div>
-               </div>
-             ))}
-          </div>
         </div>
-      </div>
 
-      <div className="mb-6 md:mb-8 craft-surface p-4">
-        <h3 className="text-sm font-semibold text-gray-600 uppercase mb-4 flex items-center gap-2">
-          <AlertCircle size={16} /> {t('dashboard.actionReminders')}
-        </h3>
-        <div className="space-y-2">
-          {actionReminders.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">{t('dashboard.noActionReminders')}</p>
-          ) : actionReminders.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => navigate('case', item.caseId, 'reminders')}
-              className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-50 last:border-0"
-            >
-              <div className="w-20 md:w-28 text-[11px] md:text-xs font-mono tint-text text-center border-r border-gray-100 pr-2 mr-3">
-                <div className="font-bold">{item.dueDate ? item.dueDate.slice(5) : '--'}</div>
-                <div>{item.dueDate ? 'DUE' : 'OPEN'}</div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm tint-text truncate">{item.title}</div>
-                <div className="text-xs text-gray-400 truncate">{item.caseName}</div>
-              </div>
-            </div>
-          ))}
+        <div className="mt-4 rounded-[24px] bg-[#f7f8f9] border border-white p-4 flex flex-wrap items-center gap-3 text-sm text-[#5e738a]">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-[#e2e8f0]"><Clock3 size={14} /> Today: {(todaySeconds / 3600).toFixed(1)}h</div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-[#e2e8f0]"><Timer size={14} /> Total: {(totalSeconds / 3600).toFixed(1)}h</div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-[#e2e8f0]"><CalendarDays size={14} /> Active Cases: {activeCases.length}</div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-[#e2e8f0]">Pending Tasks: {pendingTasks.length}</div>
         </div>
-      </div>
-
-      {/* Reminders List */}
-      <div className="mb-6 md:mb-8 craft-surface p-4">
-        <h3 className="text-sm font-semibold text-gray-600 uppercase mb-4 flex items-center gap-2">
-           <Clock size={16} /> {t('dashboard.schedule')}
-        </h3>
-        <div className="space-y-2">
-          {reminders.length === 0 ? <p className="text-sm text-gray-400 italic">{t('dashboard.noScheduledEvents')}</p> : reminders.map(r => (
-            <div key={r.id} onClick={() => navigate('case', r.caseId, 'schedule')} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-50 last:border-0">
-               <div className="w-16 md:w-24 text-[11px] md:text-xs font-mono tint-text text-center border-r border-gray-100 pr-2 mr-3">
-                 <div className="font-bold">{r.date.slice(5)}</div>
-                 <div>{r.time}</div>
-               </div>
-               <div className="flex-1">
-                 <div className="text-sm tint-text">{r.title}</div>
-                 <div className="text-xs text-gray-400">{r.caseName}</div>
-               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Calendar Section */}
-      <div className="craft-surface overflow-hidden">
-         <div className="p-4 border-b border-[#e9e9e7] flex items-center justify-between bg-gray-50">
-           <div className="flex items-center gap-2 font-medium tint-text">
-             <CalendarIcon size={18} />
-             {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
-           </div>
-           <div className="flex gap-1">
-             <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-gray-200 rounded">◀</button>
-             <button onClick={() => changeMonth(1)} className="p-1 hover:bg-gray-200 rounded">▶</button>
-           </div>
-         </div>
-         <div className="grid grid-cols-7 text-xs text-center text-gray-400 border-b border-[#e9e9e7] py-2">
-           <div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div><div>SUN</div>
-         </div>
-         <div className="grid grid-cols-7 bg-[#fbfbfa]">
-            {generateCalendar()}
-         </div>
       </div>
 
       {selectedDate && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setSelectedDate(null)}>
-          <div className="bg-white rounded-lg shadow-xl w-[400px] max-w-[94vw] overflow-hidden animate-fade-in" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
-               <h3 className="font-semibold text-gray-800">{selectedDate}</h3>
-               <button onClick={() => setSelectedDate(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center" onClick={() => setSelectedDate(null)}>
+          <div className="w-[480px] max-w-[92vw] rounded-2xl craft-panel p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div className="text-base font-semibold text-[#213246]">{selectedDate}</div>
+              <button onClick={() => setSelectedDate(null)} className="h-8 w-8 rounded-full hover:bg-white/80">×</button>
             </div>
-            <div className="p-4 max-h-[60vh] overflow-y-auto">
-               {(() => {
-                 const dayDeadlines = activeCases.flatMap(c => (c.deadlines || []).map(d => ({ ...d, type: 'Deadline', caseName: c.name, caseId: c.id }))).filter(d => d.date === selectedDate && !d.completed);
-                 const dayReminders = activeCases.flatMap(c => (c.reminders || []).map(r => ({ ...r, type: 'Reminder', caseName: c.name, caseId: c.id }))).filter(r => r.date === selectedDate);
-                 // @ts-ignore
-                 const allEvents = [...dayDeadlines, ...dayReminders];
-
-                 if (allEvents.length === 0) return <p className="text-gray-400 text-center italic py-4">{t('dashboard.noEventsForDay')}</p>;
-
-                 return (
-                   <div className="space-y-3">
-                     {allEvents.map((e, i) => (
-                       <div key={i} onClick={() => { navigate('case', e.caseId, e.type === 'Deadline' ? 'deadlines' : 'schedule'); setSelectedDate(null); }} className="p-3 rounded border border-gray-100 hover:bg-gray-50 cursor-pointer">
-                          <div className="flex justify-between items-start mb-1">
-                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${e.type === 'Deadline' ? 'tint-bg-strong tint-text' : 'tint-bg tint-text'}`}>{e.type}</span>
-                            {/* @ts-ignore */}
-                            {e.time && <span className="text-xs text-gray-400">{e.time}</span>}
-                          </div>
-                          <div className="text-sm font-medium text-gray-800">{e.title}</div>
-                          <div className="text-xs text-gray-500 mt-1">{e.caseName}</div>
-                       </div>
-                     ))}
-                   </div>
-                 );
-               })()}
+            <div className="mt-3 space-y-2 max-h-[55vh] overflow-y-auto">
+              {selectedEvents.length === 0 && <div className="text-sm text-[#7f92a7] p-2">当天暂无事件</div>}
+              {selectedEvents.map((ev, idx) => (
+                <button
+                  key={`${ev.caseId}-${idx}`}
+                  onClick={() => {
+                    navigate('case', ev.caseId, ev.type === 'deadline' ? 'deadlines' : 'schedule');
+                    setSelectedDate(null);
+                  }}
+                  className="w-full text-left p-3 rounded-xl bg-white/80 border border-[#e5eaf1]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full ${ev.type === 'deadline' ? 'bg-[#ffe1dc] text-[#9b4538]' : 'bg-[#dde8ff] text-[#2c579c]'}`}>
+                      {ev.type === 'deadline' ? 'Deadline' : 'Reminder'}
+                    </span>
+                    {ev.time && <span className="text-xs text-[#789]">{ev.time}</span>}
+                  </div>
+                  <div className="mt-1 text-sm font-medium text-[#25384d]">{ev.title}</div>
+                  <div className="text-xs text-[#7f91a6]">{ev.caseName}</div>
+                </button>
+              ))}
             </div>
           </div>
         </div>

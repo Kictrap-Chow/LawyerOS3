@@ -2,7 +2,7 @@ import React from 'react';
 import { useData } from '../store/DataContext';
 import { 
   Home, Users, Archive, Plus, Search,
-  Scale, Cloud, CloudOff, AlertTriangle, Settings, PanelLeftClose
+  Scale, Cloud, CloudOff, AlertTriangle, Settings, PanelLeftClose, Sparkles
 } from 'lucide-react';
 import { cn } from '../utils';
 import { useI18n } from '../store/I18nContext';
@@ -51,6 +51,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
       {badge && <span className="text-xs bg-[#e0e0e0] px-1.5 rounded-sm">{badge}</span>}
     </div>
   );
+  const RailItem = ({ icon: Icon, label, active, onClick }: any) => (
+    <button
+      title={label}
+      onClick={onClick}
+      className={cn(
+        "h-11 w-11 rounded-2xl grid place-items-center transition-all",
+        active
+          ? "bg-[#1f293b] text-white shadow-[0_10px_20px_rgba(31,41,59,0.25)]"
+          : "text-[#5d6f86] hover:bg-white/90"
+      )}
+    >
+      <Icon size={17} />
+    </button>
+  );
 
   const Section = ({ title, children }: any) => (
     <div className="mb-4">
@@ -81,61 +95,40 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
     .replace('Please sign in to Supabase', '请先登录后同步');
 
   return (
-    <div className={cn("w-full h-full craft-surface flex flex-col flex-shrink-0", className)}>
-      {/* App Title */}
-      <div className="p-3 h-14 flex items-center justify-between group border-b border-[#e3e9f3]">
-        <div className="flex items-center gap-2 px-2 py-1.5 w-full rounded-xl text-sm font-semibold text-strong-theme truncate">
-          {appTitle}
+    <div className={cn("w-full h-full craft-surface flex flex-row flex-shrink-0 p-2 gap-2", className)}>
+      <div className="w-[74px] rounded-[24px] bg-white/70 border border-white/80 flex flex-col items-center py-3">
+        <div className="h-11 w-11 rounded-2xl bg-[#1f293b] text-white grid place-items-center mb-4" title={appTitle}>
+          <Sparkles size={17} />
         </div>
-        {!!onToggleCollapse && (
-          <button
-            onClick={onToggleCollapse}
-            className="ml-2 p-1.5 rounded-lg hover:bg-white/80 text-gray-500 hover:text-gray-700"
-            title="Hide Sidebar"
-          >
-            <PanelLeftClose size={15} />
-          </button>
-        )}
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-2 py-3 scrollbar-hide">
-        {/* Core Nav */}
-        <div className="mb-6 craft-panel p-1.5">
-          <div onClick={onSearch} className="flex items-center gap-2 px-3 py-2 my-0.5 text-sm rounded-xl cursor-pointer text-[#4b5563] hover:bg-white">
-            <Search size={16} />
-            <span>{t('nav.search')}</span>
-            <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-[#efefed] px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-              <span className="text-xs">⌘K</span>
-            </kbd>
-          </div>
-          <NavItem 
-            icon={Home} 
-            label={t('nav.dashboard')} 
-            active={activeView === 'dashboard'} 
+        <div className="space-y-2">
+          <RailItem
+            icon={Home}
+            label={t('nav.dashboard')}
+            active={activeView === 'dashboard'}
             onClick={() => {
               navigate('dashboard');
               onAfterNavigate?.();
-            }} 
+            }}
           />
-          <NavItem 
-            icon={Users} 
-            label={t('nav.parties')} 
-            active={activeView === 'parties'} 
+          <RailItem
+            icon={Users}
+            label={t('nav.parties')}
+            active={activeView === 'parties'}
             onClick={() => {
               navigate('parties');
               onAfterNavigate?.();
-            }} 
+            }}
           />
-          <NavItem 
-            icon={Archive} 
-            label={t('nav.archives')} 
-            active={activeView === 'archives'} 
+          <RailItem
+            icon={Archive}
+            label={t('nav.archives')}
+            active={activeView === 'archives'}
             onClick={() => {
               navigate('archives');
               onAfterNavigate?.();
-            }} 
+            }}
           />
-          <NavItem
+          <RailItem
             icon={Settings}
             label={t('nav.settings')}
             active={activeView === 'settings'}
@@ -145,61 +138,116 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
             }}
           />
         </div>
-
-        {/* Case Lists */}
-        <Section title={t('nav.activeCases')}>
-          <div className="craft-panel p-1.5">
-            {caseTypeSections.map((section) => (
-              <div key={section.key} className="mb-2 last:mb-0">
-                <div className="px-2.5 py-1 text-[10px] font-semibold text-[#8f95a3] uppercase tracking-wide">{section.title}</div>
-                {section.items.map(c => (
-                  <div
-                    key={c.id}
-                    onClick={() => {
-                      navigate('case', c.id);
-                      onAfterNavigate?.();
-                    }}
-                    className={cn(
-                      "flex items-center gap-2 px-2.5 py-1.5 ml-1 text-sm rounded-xl cursor-pointer transition-colors text-[#4b5563] hover:bg-white truncate",
-                      activeCaseId === c.id && "bg-white text-strong-theme font-medium shadow-sm"
-                    )}
-                  >
-                    <Scale size={13} className="text-gray-400 shrink-0" />
-                    <span className="truncate flex-1">{c.name}</span>
-                    {c.updatedAt && <span className="text-[10px] text-gray-400 shrink-0">{new Date(c.updatedAt).toLocaleDateString()}</span>}
-                  </div>
-                ))}
-              </div>
-            ))}
-            {activeCases.length === 0 && (
-              <div className="px-3 py-2 text-xs text-gray-400">No active cases.</div>
-            )}
+        <div className="mt-auto">
+          <div className="h-11 w-11 rounded-full bg-[var(--ui-accent-soft)] border border-[var(--ui-tint-border)] text-[var(--ui-accent-2)] grid place-items-center text-xs font-semibold">
+            法
           </div>
-        </Section>
-        
-        <div 
-          onClick={() => {
-            onCreateCase();
-            onAfterNavigate?.();
-          }}
-          className="flex items-center gap-2 px-3 py-2 my-2 text-sm rounded-xl cursor-pointer text-[#6b7280] hover:bg-white/80"
-        >
-          <Plus size={16} />
-          <span>{t('nav.newCase')}</span>
         </div>
       </div>
 
-      {/* Footer / System */}
-      <div className="p-3 border-t border-[#e2e8f0] bg-white/40">
-        <div className="flex flex-col gap-1">
-          <div className={cn("flex items-center gap-2 px-2 py-1.5 text-xs rounded bg-white border border-[#e9e9e7]", currentSync.className)}>
-            <SyncIcon size={14} />
-            <span>{currentSync.text}</span>
+      <div className="flex-1 min-w-0 flex flex-col">
+        <div className="p-2 h-14 flex items-center gap-2 border-b border-[#e3e9f3]">
+          <button onClick={onSearch} className="flex-1 flex items-center gap-2 px-3 py-2 text-sm rounded-xl text-[#4b5563] bg-white/70 hover:bg-white">
+            <Search size={16} />
+            <span>{t('nav.search')}</span>
+            <kbd className="ml-auto inline-flex h-5 items-center rounded border bg-[#efefed] px-1.5 font-mono text-[10px]">
+              <span className="text-xs">⌘K</span>
+            </kbd>
+          </button>
+          <button
+            onClick={() => {
+              onCreateCase();
+              onAfterNavigate?.();
+            }}
+            className="h-10 px-3 rounded-xl text-sm bg-[#1f293b] text-white inline-flex items-center gap-1.5"
+          >
+            <Plus size={14} />
+            {t('nav.newCase')}
+          </button>
+          {!!onToggleCollapse && (
+            <button
+              onClick={onToggleCollapse}
+              className="p-2 rounded-lg hover:bg-white/80 text-gray-500 hover:text-gray-700"
+              title="Hide Sidebar"
+            >
+              <PanelLeftClose size={15} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-2 py-3 scrollbar-hide">
+          <Section title={t('nav.activeCases')}>
+            <div className="craft-panel p-1.5">
+              {caseTypeSections.map((section) => (
+                <div key={section.key} className="mb-2 last:mb-0">
+                  <div className="px-2.5 py-1 text-[10px] font-semibold text-[#8f95a3] uppercase tracking-wide">{section.title}</div>
+                  {section.items.map(c => (
+                    <div
+                      key={c.id}
+                      onClick={() => {
+                        navigate('case', c.id);
+                        onAfterNavigate?.();
+                      }}
+                      className={cn(
+                        "flex items-center gap-2 px-2.5 py-1.5 ml-1 text-sm rounded-xl cursor-pointer transition-colors text-[#4b5563] hover:bg-white truncate",
+                        activeCaseId === c.id && "bg-white text-strong-theme font-medium shadow-sm"
+                      )}
+                    >
+                      <Scale size={13} className="text-gray-400 shrink-0" />
+                      <span className="truncate flex-1">{c.name}</span>
+                      {c.updatedAt && <span className="text-[10px] text-gray-400 shrink-0">{new Date(c.updatedAt).toLocaleDateString()}</span>}
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {activeCases.length === 0 && (
+                <div className="px-3 py-2 text-xs text-gray-400">No active cases.</div>
+              )}
+            </div>
+          </Section>
+
+          <div className="mb-4 craft-panel p-1.5">
+            <NavItem
+              icon={Home}
+              label={t('nav.dashboard')}
+              active={activeView === 'dashboard'}
+              onClick={() => {
+                navigate('dashboard');
+                onAfterNavigate?.();
+              }}
+            />
+            <NavItem
+              icon={Users}
+              label={t('nav.parties')}
+              active={activeView === 'parties'}
+              onClick={() => {
+                navigate('parties');
+                onAfterNavigate?.();
+              }}
+            />
+            <NavItem
+              icon={Archive}
+              label={t('nav.archives')}
+              active={activeView === 'archives'}
+              onClick={() => {
+                navigate('archives');
+                onAfterNavigate?.();
+              }}
+            />
           </div>
-          <div className="px-2 text-[10px] text-[#9b9a97]">
-            {t('sync.lastSynced')}: {syncedTimeLabel}
+        </div>
+
+        <div className="p-3 border-t border-[#e2e8f0] bg-white/40">
+          <div className="flex flex-col gap-1">
+            <div className={cn("flex items-center gap-2 px-2 py-1.5 text-xs rounded bg-white border border-[#e9e9e7]", currentSync.className)}>
+              <SyncIcon size={14} />
+              <span>{currentSync.text}</span>
+            </div>
+            <div className="px-2 text-[10px] text-[#9b9a97]">
+              {t('sync.lastSynced')}: {syncedTimeLabel}
+            </div>
+            {syncError && <div className="px-2 text-[10px] tint-text truncate">{friendlySyncError}</div>}
           </div>
-          {syncError && <div className="px-2 text-[10px] tint-text truncate">{friendlySyncError}</div>}
         </div>
       </div>
     </div>
