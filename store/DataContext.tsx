@@ -4,17 +4,21 @@ import { nowISO } from '../utils';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { User } from '@supabase/supabase-js';
 import {
-  canReadWriteHandle,
-  clearBoundFileHandle,
+  canReadWriteTarget,
+  clearBoundSyncTarget,
   createAndPickJsonFile,
-  getBoundFileHandle,
+  getBoundSyncTarget,
   getLocalFileSyncEnabled,
+  getTargetName,
   isLocalFileSyncSupported,
   pickExistingJsonFile,
-  readPayloadFromHandle,
-  setBoundFileHandle,
+  pickSyncDirectory,
+  readPayloadFromTarget,
+  setBoundSyncDirectoryTarget,
+  setBoundSyncFileTarget,
   setLocalFileSyncEnabled,
-  writePayloadToHandle,
+  writePayloadToTarget,
+  type LocalSyncTarget,
 } from './localFileSync';
 
 interface DataContextType {
@@ -46,9 +50,12 @@ interface DataContextType {
   localFileSyncEnabled: boolean;
   localFileSyncFileName: string | null;
   localFileSyncMessage: string | null;
+  localFileSyncKind: 'file' | 'directory' | null;
+  setupLocalFileSyncByFolder: () => Promise<{ ok: boolean; message: string }>;
   setupLocalFileSyncByExport: () => Promise<{ ok: boolean; message: string }>;
   bindLocalFileSyncExisting: () => Promise<{ ok: boolean; message: string }>;
   pullFromLocalFileSync: () => Promise<{ ok: boolean; message: string }>;
+  flushLocalFileSyncNow: () => Promise<{ ok: boolean; message: string }>;
   disableLocalFileSync: () => Promise<void>;
   activeView: 'dashboard' | 'parties' | 'archives' | 'case' | 'settings';
   activeCaseId: string | null;
@@ -127,6 +134,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [localFileSyncEnabled, setLocalFileSyncEnabledState] = useState(getLocalFileSyncEnabled());
   const [localFileSyncFileName, setLocalFileSyncFileName] = useState<string | null>(null);
   const [localFileSyncMessage, setLocalFileSyncMessage] = useState<string | null>(null);
+  const [localFileSyncKind, setLocalFileSyncKind] = useState<'file' | 'directory' | null>(null);
 
   const skipNextSyncRef = useRef(false);
   const skipNextLocalSyncPushRef = useRef(false);
@@ -134,7 +142,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const localFileSaveTimerRef = useRef<number | null>(null);
   const reloadTimerRef = useRef<number | null>(null);
   const lastAutoSnapshotAtRef = useRef(0);
-  const localFileHandleRef = useRef<FileSystemFileHandle | null>(null);
+  const localSyncTargetRef = useRef<LocalSyncTarget | null>(null);
+  const mutationDuringBootstrapRef = useRef(false);
 
   const [activeView, setActiveView] = useState<'dashboard' | 'parties' | 'archives' | 'case' | 'settings'>('dashboard');
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
@@ -143,6 +152,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setSyncMode = (mode: 'local' | 'online') => {
     setSyncModeState(mode);
     localStorage.setItem(APP_KEY_SYNC_MODE, mode);
+    mutationDuringBootstrapRef.current = false;
+    setIsBootstrapped(false);
     if (mode === 'local') {
       setSyncError(null);
     }
@@ -229,11 +240,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const pullFromBoundLocalFile = useCallback(async () => {
     if (!localFileSyncSupported) return { ok: false, message: '当前浏览器不支持自动本地同步。' };
-    const handle = localFileHandleRef.current ?? (await getBoundFileHandle());
-    if (!handle) return { ok: false, message: '未绑定 JSON 文件。' };
-    const allowed = await canReadWriteHandle(handle);
+    const target = localSyncTargetRef.current ?? (await getBoundSyncTarget());
+    if (!target) return { ok: false, message: '未绑定 iCloud 同步目标。' };
+    const allowed = await canReadWriteTarget(target);
     if (!allowed) return { ok: false, message: '未获得本地文件访问权限。' };
-    const payload = await readPayloadFromHandle(handle);
+    const payload = await readPayloadFromTarget(target);
     const nextCases = Array.isArray(payload.cases) ? payload.cases.map(normalizeCase) : [];
     const nextParties = Array.isArray(payload.parties) ? payload.parties : [];
     const remoteEmpty = nextCases.length === 0 && nextParties.length === 0;
@@ -243,22 +254,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     skipNextLocalSyncPushRef.current = true;
     applyDataset(nextCases, nextParties, false);
-    localFileHandleRef.current = handle;
-    setLocalFileSyncFileName(handle.name || 'backup.json');
-    setLocalFileSyncMessage(`已从 ${handle.name || 'JSON'} 自动拉取`);
+    localSyncTargetRef.current = target;
+    setLocalFileSyncKind(target.kind);
+    setLocalFileSyncFileName(getTargetName(target));
+    setLocalFileSyncMessage(`已从 ${getTargetName(target) || 'iCloud 目标'} 自动拉取`);
     setLastSyncedAt(nowISO());
-    return { ok: true, message: '已从本地 JSON 拉取最新数据。' };
+    return { ok: true, message: '已从 iCloud 同步目标拉取最新数据。' };
   }, [cases.length, localFileSyncSupported, parties.length]);
 
-  const bindHandle = useCallback(async (handle: FileSystemFileHandle) => {
-    const allowed = await canReadWriteHandle(handle);
+  const bindTarget = useCallback(async (target: LocalSyncTarget) => {
+    const allowed = await canReadWriteTarget(target);
     if (!allowed) return { ok: false, message: '未授予读写权限，无法启用自动同步。' };
-    await setBoundFileHandle(handle);
+    if (target.kind === 'directory') await setBoundSyncDirectoryTarget(target.handle);
+    else await setBoundSyncFileTarget(target.handle);
     setLocalFileSyncEnabled(true);
     setLocalFileSyncEnabledState(true);
-    setLocalFileSyncFileName(handle.name || 'backup.json');
-    localFileHandleRef.current = handle;
-    setLocalFileSyncMessage(`已绑定 ${handle.name || 'JSON'}，后续将自动同步`);
+    setLocalFileSyncKind(target.kind);
+    setLocalFileSyncFileName(getTargetName(target));
+    localSyncTargetRef.current = target;
+    setLocalFileSyncMessage(`已绑定 ${getTargetName(target) || 'iCloud 目标'}，后续将自动同步`);
     if (syncMode === 'local') {
       setSyncStatus('online');
       setSyncError(null);
@@ -266,39 +280,75 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { ok: true, message: '本地自动同步已启用。' };
   }, [syncMode]);
 
+  const flushLocalFileSyncNow = useCallback(async () => {
+    if (!localFileSyncEnabled || !localFileSyncSupported) {
+      return { ok: false, message: '本地自动同步未启用。' };
+    }
+    const target = localSyncTargetRef.current ?? (await getBoundSyncTarget());
+    if (!target) return { ok: false, message: '未绑定 iCloud 同步目标。' };
+    const allowed = await canReadWriteTarget(target);
+    if (!allowed) return { ok: false, message: '同步权限失效，请重新绑定。' };
+    await writePayloadToTarget(target, { cases, parties });
+    localSyncTargetRef.current = target;
+    setLocalFileSyncKind(target.kind);
+    setLocalFileSyncFileName(getTargetName(target));
+    setLocalFileSyncMessage(`已同步到 ${getTargetName(target) || 'iCloud 目标'} · ${new Date().toLocaleTimeString()}`);
+    setLastSyncedAt(nowISO());
+    return { ok: true, message: '已立即同步。' };
+  }, [cases, localFileSyncEnabled, localFileSyncSupported, parties]);
+
+  const setupLocalFileSyncByFolder = useCallback(async () => {
+    if (!localFileSyncSupported) return { ok: false, message: '当前浏览器不支持自动本地同步。' };
+    try {
+      const target = await pickSyncDirectory();
+      await writePayloadToTarget(target, { cases, parties });
+      const bound = await bindTarget(target);
+      setLastSyncedAt(nowISO());
+      return bound.ok ? { ok: true, message: `已初始化并绑定 ${getTargetName(target)}` } : bound;
+    } catch {
+      return { ok: false, message: '已取消目录绑定或初始化失败。' };
+    }
+  }, [bindTarget, cases, localFileSyncSupported, parties]);
+
   const setupLocalFileSyncByExport = useCallback(async () => {
     if (!localFileSyncSupported) return { ok: false, message: '当前浏览器不支持自动本地同步。' };
     try {
-      const handle = await createAndPickJsonFile(`LawyerOS_Backup_${new Date().toISOString().slice(0, 10)}.json`);
-      await writePayloadToHandle(handle, { cases, parties });
-      const bound = await bindHandle(handle);
+      const target = await createAndPickJsonFile(`LawyerOS_Backup_${new Date().toISOString().slice(0, 10)}.json`);
+      await writePayloadToTarget(target, { cases, parties });
+      const bound = await bindTarget(target);
       setLastSyncedAt(nowISO());
-      return bound.ok ? { ok: true, message: `已导出并绑定 ${handle.name}` } : bound;
+      return bound.ok ? { ok: true, message: `已导出并绑定 ${getTargetName(target)}` } : bound;
     } catch {
       return { ok: false, message: '已取消导出或导出失败。' };
     }
-  }, [bindHandle, cases, localFileSyncSupported, parties]);
+  }, [bindTarget, cases, localFileSyncSupported, parties]);
 
   const bindLocalFileSyncExisting = useCallback(async () => {
     if (!localFileSyncSupported) return { ok: false, message: '当前浏览器不支持自动本地同步。' };
     try {
-      const handle = await pickExistingJsonFile();
-      const bound = await bindHandle(handle);
+      let target: LocalSyncTarget;
+      if ('showDirectoryPicker' in window) {
+        target = await pickSyncDirectory();
+      } else {
+        target = await pickExistingJsonFile();
+      }
+      const bound = await bindTarget(target);
       if (!bound.ok) return bound;
       const pulled = await pullFromBoundLocalFile();
-      return pulled.ok ? { ok: true, message: `已绑定并拉取 ${handle.name}` } : pulled;
+      return pulled.ok ? { ok: true, message: `已绑定并拉取 ${getTargetName(target)}` } : pulled;
     } catch {
       return { ok: false, message: '已取消绑定。' };
     }
-  }, [bindHandle, localFileSyncSupported, pullFromBoundLocalFile]);
+  }, [bindTarget, localFileSyncSupported, pullFromBoundLocalFile]);
 
   const disableLocalFileSync = useCallback(async () => {
     setLocalFileSyncEnabled(false);
     setLocalFileSyncEnabledState(false);
+    setLocalFileSyncKind(null);
     setLocalFileSyncFileName(null);
     setLocalFileSyncMessage('已关闭本地自动同步。');
-    localFileHandleRef.current = null;
-    await clearBoundFileHandle();
+    localSyncTargetRef.current = null;
+    await clearBoundSyncTarget();
     if (syncMode === 'local') {
       setSyncStatus('offline');
     }
@@ -373,18 +423,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [syncMode]);
 
   useEffect(() => {
+    if (isBootstrapped) return;
     const bootstrap = async () => {
+      const shouldAbortBootstrapApply = () => mutationDuringBootstrapRef.current;
       setAppTitleState(DEFAULT_APP_TITLE);
       localStorage.removeItem('lawyerAppTitle_v18');
 
       if (syncMode === 'local') {
         if (localFileSyncSupported && getLocalFileSyncEnabled()) {
-          const handle = await getBoundFileHandle();
-          if (handle) {
-            localFileHandleRef.current = handle;
+          const target = await getBoundSyncTarget();
+          if (shouldAbortBootstrapApply()) {
+            setIsBootstrapped(true);
+            return;
+          }
+          if (target) {
+            localSyncTargetRef.current = target;
+            setLocalFileSyncKind(target.kind);
             setLocalFileSyncEnabledState(true);
-            setLocalFileSyncFileName(handle.name || 'backup.json');
+            setLocalFileSyncFileName(getTargetName(target));
             const pulled = await pullFromBoundLocalFile();
+            if (shouldAbortBootstrapApply()) {
+              setIsBootstrapped(true);
+              return;
+            }
             if (pulled.ok) {
               setSyncStatus('online');
               setSyncError(null);
@@ -396,6 +457,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             setLocalFileSyncEnabled(false);
             setLocalFileSyncEnabledState(false);
+            setLocalFileSyncKind(null);
           }
         }
         loadFromLocal();
@@ -407,6 +469,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (isSupabaseConfigured && supabase && syncMode === 'online') {
         if (authLoading) return;
         if (!authUser?.id) {
+          if (shouldAbortBootstrapApply()) {
+            setIsBootstrapped(true);
+            return;
+          }
           // Keep local data visible when signed out; only disable cloud sync.
           loadFromLocal();
           setSyncStatus('offline');
@@ -415,6 +481,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
         const loaded = await loadFromSupabase(authUser.id);
+        if (shouldAbortBootstrapApply()) {
+          setIsBootstrapped(true);
+          return;
+        }
         if (loaded) {
           setIsBootstrapped(true);
           return;
@@ -422,6 +492,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const serverLoaded = await loadFromServerFile();
+      if (shouldAbortBootstrapApply()) {
+        setIsBootstrapped(true);
+        return;
+      }
       if (!serverLoaded) {
         loadFromLocal();
       }
@@ -430,7 +504,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     void bootstrap();
-  }, [authLoading, authUser?.id, loadFromLocal, loadFromServerFile, loadFromSupabase, localFileSyncEnabled, localFileSyncSupported, pullFromBoundLocalFile, syncMode]);
+  }, [authLoading, authUser?.id, isBootstrapped, loadFromLocal, loadFromServerFile, loadFromSupabase, localFileSyncEnabled, localFileSyncSupported, pullFromBoundLocalFile, syncMode]);
 
   const saveToServerFile = useCallback(async (nextCases: Case[], nextParties: Party[]) => {
     try {
@@ -546,9 +620,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!isBootstrapped) return;
 
+    const skipCloudSyncThisRound = skipNextSyncRef.current;
     if (skipNextSyncRef.current) {
       skipNextSyncRef.current = false;
-      return;
     }
 
     if (localFileSyncEnabled && localFileSyncSupported) {
@@ -557,28 +631,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         if (localFileSaveTimerRef.current) window.clearTimeout(localFileSaveTimerRef.current);
         localFileSaveTimerRef.current = window.setTimeout(async () => {
-          const handle = localFileHandleRef.current ?? (await getBoundFileHandle());
-          if (!handle) return;
-          const allowed = await canReadWriteHandle(handle);
+          const target = localSyncTargetRef.current ?? (await getBoundSyncTarget());
+          if (!target) return;
+          const allowed = await canReadWriteTarget(target);
           if (!allowed) {
             setLocalFileSyncMessage('本地同步权限失效，请在设置页重新绑定文件。');
             return;
           }
-          await writePayloadToHandle(handle, { cases, parties });
-          localFileHandleRef.current = handle;
-          setLocalFileSyncFileName(handle.name || 'backup.json');
-          setLocalFileSyncMessage(`已自动同步到 ${handle.name || 'JSON'}`);
+          await writePayloadToTarget(target, { cases, parties });
+          localSyncTargetRef.current = target;
+          setLocalFileSyncKind(target.kind);
+          setLocalFileSyncFileName(getTargetName(target));
+          setLocalFileSyncMessage(`已自动同步到 ${getTargetName(target) || 'iCloud 目标'}`);
           setLastSyncedAt(nowISO());
         }, 500);
       }
     }
 
-    if (syncMode === 'online') {
+    if (syncMode === 'online' && !skipCloudSyncThisRound) {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = window.setTimeout(() => {
         void syncToSupabase(cases, parties, authUser?.id || null);
       }, 450);
-    } else {
+    } else if (syncMode !== 'online') {
       void saveToServerFile(cases, parties);
     }
 
@@ -613,6 +688,36 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [authUser?.id, loadFromSupabase, syncMode]);
 
+  useEffect(() => {
+    if (!localFileSyncEnabled || !localFileSyncSupported || !isBootstrapped) return;
+    const flushLocalNow = async () => {
+      const target = localSyncTargetRef.current ?? (await getBoundSyncTarget());
+      if (!target) return;
+      const allowed = await canReadWriteTarget(target);
+      if (!allowed) return;
+      await writePayloadToTarget(target, { cases, parties });
+      localSyncTargetRef.current = target;
+      setLocalFileSyncKind(target.kind);
+      setLocalFileSyncFileName(getTargetName(target));
+      setLocalFileSyncMessage(`已同步到 ${getTargetName(target) || 'iCloud 目标'} · ${new Date().toLocaleTimeString()}`);
+      setLastSyncedAt(nowISO());
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        void flushLocalNow();
+      }
+    };
+    const onPageHide = () => {
+      void flushLocalNow();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, [cases, parties, isBootstrapped, localFileSyncEnabled, localFileSyncSupported]);
+
   const signIn = async (email: string, password: string) => {
     if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请切换到联网模式后登录。' };
     if (!supabase) return { ok: false, message: '云端同步未配置。' };
@@ -643,27 +748,33 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateCase = (updatedCase: Case) => {
+    if (!isBootstrapped) mutationDuringBootstrapRef.current = true;
     setCases((prev) => prev.map((item) => (item.id === updatedCase.id ? normalizeCase({ ...updatedCase, updatedAt: nowISO() }) : item)));
   };
 
   const addCase = (newCase: Case) => {
+    if (!isBootstrapped) mutationDuringBootstrapRef.current = true;
     setCases((prev) => [normalizeCase({ ...newCase, updatedAt: nowISO() }), ...prev]);
   };
 
   const deleteCase = (id: string) => {
+    if (!isBootstrapped) mutationDuringBootstrapRef.current = true;
     setCases((prev) => prev.filter((item) => item.id !== id));
     if (activeCaseId === id) navigate('dashboard');
   };
 
   const updateParty = (updatedParty: Party) => {
+    if (!isBootstrapped) mutationDuringBootstrapRef.current = true;
     setParties((prev) => prev.map((item) => (item.id === updatedParty.id ? updatedParty : item)));
   };
 
   const addParty = (newParty: Party) => {
+    if (!isBootstrapped) mutationDuringBootstrapRef.current = true;
     setParties((prev) => [newParty, ...prev]);
   };
 
   const deleteParty = (id: string) => {
+    if (!isBootstrapped) mutationDuringBootstrapRef.current = true;
     setParties((prev) => prev.filter((item) => item.id !== id));
   };
 
@@ -726,11 +837,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signOut,
         localFileSyncSupported,
         localFileSyncEnabled,
+        localFileSyncKind,
         localFileSyncFileName,
         localFileSyncMessage,
+        setupLocalFileSyncByFolder,
         setupLocalFileSyncByExport,
         bindLocalFileSyncExisting,
         pullFromLocalFileSync,
+        flushLocalFileSyncNow,
         disableLocalFileSync,
         activeView,
         activeCaseId,

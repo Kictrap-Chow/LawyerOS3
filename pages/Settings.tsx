@@ -11,8 +11,8 @@ export const Settings: React.FC = () => {
   const {
     isSupabaseEnabled, authLoading, isAuthenticated, userEmail, syncMode, setSyncMode, signIn, signUp, signOut,
     exportData, importData,
-    localFileSyncSupported, localFileSyncEnabled, localFileSyncFileName, localFileSyncMessage,
-    setupLocalFileSyncByExport, bindLocalFileSyncExisting, pullFromLocalFileSync, disableLocalFileSync
+    localFileSyncSupported, localFileSyncEnabled, localFileSyncKind, localFileSyncFileName, localFileSyncMessage,
+    setupLocalFileSyncByFolder, setupLocalFileSyncByExport, bindLocalFileSyncExisting, pullFromLocalFileSync, flushLocalFileSyncNow, disableLocalFileSync
   } = useData();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -76,6 +76,13 @@ export const Settings: React.FC = () => {
 
   const handleSetupLocalSync = async () => {
     setLocalSyncBusy(true);
+    const res = await setupLocalFileSyncByFolder();
+    setLocalSyncBusy(false);
+    setLocalSyncActionMessage(res.message);
+  };
+
+  const handleSetupLegacyFileSync = async () => {
+    setLocalSyncBusy(true);
     const res = await setupLocalFileSyncByExport();
     setLocalSyncBusy(false);
     setLocalSyncActionMessage(res.message);
@@ -100,6 +107,13 @@ export const Settings: React.FC = () => {
     await disableLocalFileSync();
     setLocalSyncBusy(false);
     setLocalSyncActionMessage('已关闭自动同步。');
+  };
+
+  const handleFlushNow = async () => {
+    setLocalSyncBusy(true);
+    const res = await flushLocalFileSyncNow();
+    setLocalSyncBusy(false);
+    setLocalSyncActionMessage(res.message);
   };
 
   const copyCalendarUrl = async () => {
@@ -159,7 +173,7 @@ export const Settings: React.FC = () => {
             </div>
             <div className="rounded-xl border border-[var(--ui-line)] bg-white/50 p-3">
               <div className="text-xs text-gray-500 mb-2">
-                首次先“导出并绑定 iCloud 文件”，之后每次打开页面会自动拉取，且每次修改会自动写回同一个 JSON。
+                推荐先“绑定 iCloud 文件夹（分模块）”：系统会按 `manifest + cases + parties` 分文件同步。每次打开页面自动拉取，每次修改自动写回。
               </div>
               {!localFileSyncSupported && (
                 <div className="text-xs text-[#8b6b4e] mb-2">
@@ -172,14 +186,21 @@ export const Settings: React.FC = () => {
                   disabled={syncMode !== 'local' || !localFileSyncSupported || localSyncBusy}
                   className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
                 >
-                  首次导出并绑定 iCloud 文件
+                  绑定 iCloud 文件夹（推荐）
+                </button>
+                <button
+                  onClick={handleSetupLegacyFileSync}
+                  disabled={syncMode !== 'local' || !localFileSyncSupported || localSyncBusy}
+                  className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+                >
+                  绑定单文件 JSON（兼容）
                 </button>
                 <button
                   onClick={handleBindExisting}
                   disabled={syncMode !== 'local' || !localFileSyncSupported || localSyncBusy}
                   className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
                 >
-                  绑定已有 iCloud JSON
+                  绑定已有 iCloud 目标
                 </button>
                 <button
                   onClick={handlePullNow}
@@ -187,6 +208,13 @@ export const Settings: React.FC = () => {
                   className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
                 >
                   立即拉取一次
+                </button>
+                <button
+                  onClick={handleFlushNow}
+                  disabled={syncMode !== 'local' || !localFileSyncEnabled || localSyncBusy}
+                  className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+                >
+                  立即同步
                 </button>
                 <button
                   onClick={handleDisableLocalSync}
@@ -197,7 +225,7 @@ export const Settings: React.FC = () => {
                 </button>
               </div>
               <div className="mt-2 text-xs text-[#6a7d93]">
-                状态：{syncMode === 'local' ? (localFileSyncEnabled ? `已启用（${localFileSyncFileName || '未命名文件'}）` : '未启用') : '当前为联网模式'}
+                状态：{syncMode === 'local' ? (localFileSyncEnabled ? `已启用（${localFileSyncKind === 'directory' ? '分模块' : '单文件'} · ${localFileSyncFileName || '未命名目标'}）` : '未启用') : '当前为联网模式'}
               </div>
               {(localSyncActionMessage || localFileSyncMessage) && (
                 <div className="mt-1 text-xs text-[#6a7d93]">{localSyncActionMessage || localFileSyncMessage}</div>
