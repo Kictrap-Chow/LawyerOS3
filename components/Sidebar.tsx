@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useData } from '../store/DataContext';
-import { 
-  Home, Users, Archive, Plus, Search,
-  Scale, Cloud, CloudOff, AlertTriangle, Settings, PanelLeftClose, Sparkles
+import {
+  Home, Users, Archive, Search,
+  Scale, Cloud, CloudOff, AlertTriangle, Settings, PanelLeftClose, Sparkles, FolderPlus, Landmark
 } from 'lucide-react';
 import { cn } from '../utils';
 import { useI18n } from '../store/I18nContext';
@@ -19,6 +19,20 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, className, onAfterNavigate, onToggleCollapse }) => {
   const { cases, activeView, activeCaseId, navigate, appTitle, syncStatus, syncError, lastSyncedAt, isSupabaseEnabled } = useData();
   const { t } = useI18n();
+  const topBarRef = useRef<HTMLDivElement | null>(null);
+  const [compactTopActions, setCompactTopActions] = useState(false);
+
+  useEffect(() => {
+    const node = topBarRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect?.width ?? 0;
+      setCompactTopActions(width < 290);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   const activeCases = cases
     .filter(c => c.status !== 'archived')
     .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
@@ -139,30 +153,40 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSearch, onCreateCase, classN
           />
         </div>
         <div className="mt-auto">
-          <div className="h-11 w-11 rounded-full bg-[var(--ui-accent-soft)] border border-[var(--ui-tint-border)] text-[var(--ui-accent-2)] grid place-items-center text-xs font-semibold">
-            法
+          <div
+            className="h-11 w-11 rounded-full bg-[var(--ui-accent-soft)] border border-[var(--ui-tint-border)] text-[var(--ui-accent-2)] grid place-items-center"
+            title="LawyerOS"
+          >
+            <Landmark size={15} />
           </div>
         </div>
       </div>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <div className="p-2 h-14 flex items-center gap-2 border-b border-[#e3e9f3]">
+        <div ref={topBarRef} className="p-2 h-14 flex items-center gap-2 border-b border-[#e3e9f3]">
           <button onClick={onSearch} className="flex-1 flex items-center gap-2 px-3 py-2 text-sm rounded-xl text-[#4b5563] bg-white/70 hover:bg-white">
             <Search size={16} />
-            <span>{t('nav.search')}</span>
-            <kbd className="ml-auto inline-flex h-5 items-center rounded border bg-[#efefed] px-1.5 font-mono text-[10px]">
-              <span className="text-xs">⌘K</span>
-            </kbd>
+            {!compactTopActions && (
+              <>
+                <span>{t('nav.search')}</span>
+                <kbd className="ml-auto inline-flex h-5 items-center rounded border bg-[#efefed] px-1.5 font-mono text-[10px]">
+                  <span className="text-xs">⌘K</span>
+                </kbd>
+              </>
+            )}
           </button>
           <button
             onClick={() => {
               onCreateCase();
               onAfterNavigate?.();
             }}
-            className="h-10 px-3 rounded-xl text-sm bg-[#1f293b] text-white inline-flex items-center gap-1.5"
+            className="h-10 px-3 rounded-xl text-sm bg-[#1f293b] text-white inline-flex items-center gap-1.5 shadow-[0_10px_20px_rgba(31,41,59,0.24)]"
+            title={t('nav.newCase')}
           >
-            <Plus size={14} />
-            {t('nav.newCase')}
+            <span className="h-6 w-6 rounded-md bg-white/18 inline-flex items-center justify-center">
+              <FolderPlus size={14} />
+            </span>
+            {!compactTopActions && t('nav.newCase')}
           </button>
           {!!onToggleCollapse && (
             <button

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DataProvider, useData } from './store/DataContext';
 import { I18nProvider } from './store/I18nContext';
 import { ThemeProvider } from './store/ThemeContext';
@@ -19,13 +19,16 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 const MainLayout: React.FC = () => {
+  const SIDEBAR_MIN_WIDTH = 332;
+  const SIDEBAR_MAX_WIDTH = 460;
+  const MOBILE_LAYOUT_BREAKPOINT = 900;
   const { activeView, activeCaseId, navigate, addCase, cases, updateCase } = useData();
   const [showCaseForm, setShowCaseForm] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showDesktopNav, setShowDesktopNav] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     const saved = Number(localStorage.getItem('lawyerSidebarWidth'));
-    return Number.isFinite(saved) ? Math.min(420, Math.max(248, saved)) : 292;
+    return Number.isFinite(saved) ? Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, saved)) : 360;
   });
   const [showMobileCases, setShowMobileCases] = useState(false);
   const [showQuickTask, setShowQuickTask] = useState(false);
@@ -35,7 +38,45 @@ const MainLayout: React.FC = () => {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showIosInstallHint, setShowIosInstallHint] = useState(false);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [layoutWidth, setLayoutWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 1200;
+    return Math.min(window.innerWidth, window.visualViewport?.width || window.innerWidth);
+  });
+  const [mobileMediaMatched, setMobileMediaMatched] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia(`(max-width: ${MOBILE_LAYOUT_BREAKPOINT}px)`).matches;
+  });
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const autoCollapsedRef = useRef(false);
+  const isMobileLayout = mobileMediaMatched || layoutWidth < MOBILE_LAYOUT_BREAKPOINT;
+  const MIN_MAIN_WIDTH = 760;
+  const shouldAutoCollapseSidebar = !isMobileLayout && layoutWidth < sidebarWidth + MIN_MAIN_WIDTH;
+
+  useEffect(() => {
+    const updateLayoutWidth = () => {
+      const effectiveWidth = Math.min(window.innerWidth, window.visualViewport?.width || window.innerWidth);
+      setLayoutWidth(effectiveWidth);
+      setMobileMediaMatched(effectiveWidth <= MOBILE_LAYOUT_BREAKPOINT || window.matchMedia(`(max-width: ${MOBILE_LAYOUT_BREAKPOINT}px)`).matches);
+    };
+    updateLayoutWidth();
+    window.addEventListener('resize', updateLayoutWidth);
+    window.visualViewport?.addEventListener('resize', updateLayoutWidth);
+    return () => {
+      window.removeEventListener('resize', updateLayoutWidth);
+      window.visualViewport?.removeEventListener('resize', updateLayoutWidth);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (shouldAutoCollapseSidebar && showDesktopNav) {
+      autoCollapsedRef.current = true;
+      setShowDesktopNav(false);
+    }
+    if (!shouldAutoCollapseSidebar && !showDesktopNav && autoCollapsedRef.current) {
+      autoCollapsedRef.current = false;
+      setShowDesktopNav(true);
+    }
+  }, [shouldAutoCollapseSidebar, showDesktopNav]);
 
   useEffect(() => {
     localStorage.setItem('lawyerSidebarWidth', String(sidebarWidth));
@@ -45,7 +86,15 @@ const MainLayout: React.FC = () => {
     const onMouseMove = (event: MouseEvent) => {
       if (!resizeRef.current) return;
       const delta = event.clientX - resizeRef.current.startX;
-      const nextWidth = Math.min(420, Math.max(248, resizeRef.current.startWidth + delta));
+      const rawWidth = resizeRef.current.startWidth + delta;
+      if (rawWidth < SIDEBAR_MIN_WIDTH - 16) {
+        resizeRef.current = null;
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        setShowDesktopNav(false);
+        return;
+      }
+      const nextWidth = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, rawWidth));
       setSidebarWidth(nextWidth);
     };
     const onMouseUp = () => {
@@ -60,7 +109,7 @@ const MainLayout: React.FC = () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
     };
-  }, []);
+  }, [SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH]);
 
   useEffect(() => {
     const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as any).standalone;
@@ -114,7 +163,7 @@ const MainLayout: React.FC = () => {
     .filter((c) => c.status !== 'archived')
     .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
 
-  const openQuickTask = () => {
+  const openQuickTask = useCallback(() => {
     if (mobileCases.length === 0) {
       alert('请先新建案件');
       return;
@@ -123,7 +172,7 @@ const MainLayout: React.FC = () => {
     setQuickTaskDesc('');
     setQuickTaskType('文书');
     setShowQuickTask(true);
-  };
+  }, [mobileCases, cases]);
 
   const createQuickTask = () => {
     const target = cases.find((c) => c.id === quickCaseId);
@@ -175,15 +224,29 @@ const MainLayout: React.FC = () => {
     setShowIosInstallHint(false);
   };
 
+  useEffect(() => {
+    const onOpenSearch = () => setShowSearch(true);
+    const onOpenQuickTask = () => openQuickTask();
+    window.addEventListener('lawyer:open-search', onOpenSearch);
+    window.addEventListener('lawyer:open-quick-task', onOpenQuickTask);
+    return () => {
+      window.removeEventListener('lawyer:open-search', onOpenSearch);
+      window.removeEventListener('lawyer:open-quick-task', onOpenQuickTask);
+    };
+  }, [openQuickTask]);
+
   return (
     <div className="flex h-dvh w-full max-w-full text-[#1f2937] font-sans antialiased overflow-hidden overflow-x-hidden selection:bg-blue-100 selection:text-blue-900 p-1.5 md:p-3 gap-1.5 md:gap-3">
-      {showDesktopNav && (
-        <div className="hidden md:flex h-full relative shrink-0" style={{ width: `${sidebarWidth}px` }}>
+      {!isMobileLayout && showDesktopNav && (
+        <div className="flex h-full relative shrink-0" style={{ width: `${sidebarWidth}px` }}>
           <Sidebar
             className="flex w-full"
             onSearch={() => setShowSearch(true)}
             onCreateCase={() => setShowCaseForm(true)}
-            onToggleCollapse={() => setShowDesktopNav(false)}
+            onToggleCollapse={() => {
+              autoCollapsedRef.current = false;
+              setShowDesktopNav(false);
+            }}
           />
           <button
             type="button"
@@ -197,11 +260,14 @@ const MainLayout: React.FC = () => {
         </div>
       )}
 
-      <main className="flex-1 h-full max-w-full overflow-y-auto overflow-x-hidden relative craft-surface p-1.5 pb-24 md:pb-3 md:p-3">
-        {!showDesktopNav && (
-          <div className="hidden md:block fixed left-3 top-3 z-40">
+      <main className="flex-1 h-full max-w-full overflow-y-auto overflow-x-hidden relative rounded-[24px] bg-[rgba(252,246,237,0.42)] p-1.5 pb-24 md:pb-3 md:p-3">
+        {!isMobileLayout && !showDesktopNav && (
+          <div className="fixed left-3 top-3 z-40">
             <button
-              onClick={() => setShowDesktopNav(true)}
+              onClick={() => {
+                autoCollapsedRef.current = false;
+                setShowDesktopNav(true);
+              }}
               className="p-2 rounded-xl hover:bg-gray-100 border border-gray-200 bg-white/85 backdrop-blur-sm"
               title="Show Sidebar"
             >
@@ -209,23 +275,25 @@ const MainLayout: React.FC = () => {
             </button>
           </div>
         )}
-        <div className="md:hidden sticky top-0 z-30 mb-2 px-2 py-2.5 craft-panel backdrop-blur supports-[backdrop-filter]:bg-white/75 shadow-[0_10px_24px_rgba(17,36,74,0.12)]">
-          <div className="flex items-center gap-2">
-            <div className="flex-1 truncate">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--ui-muted)]">LawyerOS</div>
-              <div className="truncate text-sm font-semibold text-[var(--ui-text-strong)]">{getHeaderTitle()}</div>
+        {isMobileLayout && (
+          <div className="sticky top-0 z-30 mb-2 px-2 py-2.5 craft-panel backdrop-blur supports-[backdrop-filter]:bg-white/75 shadow-[0_10px_24px_rgba(17,36,74,0.12)]">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 truncate">
+                <div className="text-[11px] tracking-[0.03em] text-[var(--ui-muted)]">Legal Nice OS by Disorder Tangerine</div>
+                <div className="truncate text-sm font-semibold text-[var(--ui-text-strong)]">{getHeaderTitle()}</div>
+              </div>
+              <button onClick={() => setShowSearch(true)} className="p-2 rounded-xl hover:bg-gray-100">
+                <Search size={18} />
+              </button>
+              <button onClick={openQuickTask} className="p-2 rounded-xl hover:bg-gray-100">
+                <ClipboardPlus size={18} />
+              </button>
+              <button onClick={() => setShowCaseForm(true)} className="p-2 rounded-xl hover:bg-gray-100">
+                <Plus size={18} />
+              </button>
             </div>
-            <button onClick={() => setShowSearch(true)} className="p-2 rounded-xl hover:bg-gray-100">
-              <Search size={18} />
-            </button>
-            <button onClick={openQuickTask} className="p-2 rounded-xl hover:bg-gray-100">
-              <ClipboardPlus size={18} />
-            </button>
-            <button onClick={() => setShowCaseForm(true)} className="p-2 rounded-xl hover:bg-gray-100">
-              <Plus size={18} />
-            </button>
           </div>
-        </div>
+        )}
 
         {activeView === 'dashboard' && <Dashboard />}
         {activeView === 'case' && <CaseDetail />}
@@ -272,8 +340,8 @@ const MainLayout: React.FC = () => {
       {showSearch && <GlobalSearch onClose={() => setShowSearch(false)} />}
       <FloatingTimer />
 
-      {showInstallBanner && (installPrompt || showIosInstallHint) && (
-        <div className="md:hidden fixed left-2 right-2 z-50" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.8rem)' }}>
+      {isMobileLayout && showInstallBanner && (installPrompt || showIosInstallHint) && (
+        <div className="fixed left-2 right-2 z-50" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.8rem)' }}>
           <div className="craft-panel px-3 py-2.5 border border-[var(--ui-tint-border)] shadow-[0_12px_28px_rgba(10,37,64,0.2)]">
             <div className="flex items-start gap-2.5">
               <div className="h-8 w-8 rounded-xl accent-gradient-bg text-white flex items-center justify-center shrink-0 mt-0.5">
@@ -296,51 +364,53 @@ const MainLayout: React.FC = () => {
         </div>
       )}
 
-      <div
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 px-2 pb-2"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}
-      >
-        <div className="grid grid-cols-5 gap-1 craft-panel border border-white/70 p-1 shadow-[0_14px_26px_rgba(13,35,64,0.16)]">
-          <button
-            onClick={() => navigate('dashboard')}
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'dashboard' ? 'accent-text bg-[var(--ui-accent-soft)] ring-1 ring-[var(--ui-tint-border)]' : 'text-gray-500'}`}
-          >
-            <Home size={16} />
-            <span>仪表盘</span>
-          </button>
-          <button
-            onClick={() => navigate('parties')}
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'parties' ? 'accent-text bg-[var(--ui-accent-soft)] ring-1 ring-[var(--ui-tint-border)]' : 'text-gray-500'}`}
-          >
-            <Users size={16} />
-            <span>当事人</span>
-          </button>
-          <button
-            onClick={() => navigate('settings')}
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'settings' ? 'accent-text bg-[var(--ui-accent-soft)] ring-1 ring-[var(--ui-tint-border)]' : 'text-gray-500'}`}
-          >
-            <SettingsIcon size={16} />
-            <span>设置</span>
-          </button>
-          <button
-            onClick={() => setShowMobileCases(true)}
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'case' || showMobileCases ? 'accent-text bg-[var(--ui-accent-soft)] ring-1 ring-[var(--ui-tint-border)]' : 'text-gray-500'}`}
-          >
-            <Briefcase size={16} />
-            <span>案件</span>
-          </button>
-          <button
-            onClick={() => navigate('archives')}
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'archives' ? 'accent-text bg-[var(--ui-accent-soft)] ring-1 ring-[var(--ui-tint-border)]' : 'text-gray-500'}`}
-          >
-            <Archive size={16} />
-            <span>归档</span>
-          </button>
+      {isMobileLayout && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-40 px-2 pb-2"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}
+        >
+          <div className="grid grid-cols-5 gap-1 craft-panel border border-white/70 p-1 shadow-[0_14px_26px_rgba(13,35,64,0.16)]">
+            <button
+              onClick={() => navigate('dashboard')}
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'dashboard' ? 'accent-text bg-[var(--ui-accent-soft)] ring-1 ring-[var(--ui-tint-border)]' : 'text-gray-500'}`}
+            >
+              <Home size={16} />
+              <span>仪表盘</span>
+            </button>
+            <button
+              onClick={() => navigate('parties')}
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'parties' ? 'accent-text bg-[var(--ui-accent-soft)] ring-1 ring-[var(--ui-tint-border)]' : 'text-gray-500'}`}
+            >
+              <Users size={16} />
+              <span>当事人</span>
+            </button>
+            <button
+              onClick={() => navigate('settings')}
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'settings' ? 'accent-text bg-[var(--ui-accent-soft)] ring-1 ring-[var(--ui-tint-border)]' : 'text-gray-500'}`}
+            >
+              <SettingsIcon size={16} />
+              <span>设置</span>
+            </button>
+            <button
+              onClick={() => setShowMobileCases(true)}
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'case' || showMobileCases ? 'accent-text bg-[var(--ui-accent-soft)] ring-1 ring-[var(--ui-tint-border)]' : 'text-gray-500'}`}
+            >
+              <Briefcase size={16} />
+              <span>案件</span>
+            </button>
+            <button
+              onClick={() => navigate('archives')}
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] ${activeView === 'archives' ? 'accent-text bg-[var(--ui-accent-soft)] ring-1 ring-[var(--ui-tint-border)]' : 'text-gray-500'}`}
+            >
+              <Archive size={16} />
+              <span>归档</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {showMobileCases && (
-        <div className="md:hidden fixed inset-0 z-50 flex items-end">
+      {isMobileLayout && showMobileCases && (
+        <div className="fixed inset-0 z-50 flex items-end">
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowMobileCases(false)} />
           <div className="relative w-full rounded-t-3xl bg-white/95 border-t border-[#dce7f5] max-h-[80vh] overflow-y-auto p-3 shadow-[0_-18px_36px_rgba(13,35,64,0.22)]">
             <div className="w-10 h-1 rounded-full bg-[#d2dceb] mx-auto mb-2" />
@@ -368,11 +438,11 @@ const MainLayout: React.FC = () => {
         </div>
       )}
 
-      {showQuickTask && (
-        <div className="md:hidden fixed inset-0 z-50 flex items-end">
+      {isMobileLayout && showQuickTask && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center md:justify-center">
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowQuickTask(false)} />
-          <div className="relative w-full rounded-t-3xl bg-white/95 border-t border-[#dce7f5] p-3 shadow-[0_-18px_36px_rgba(13,35,64,0.22)]">
-            <div className="w-10 h-1 rounded-full bg-[#d2dceb] mx-auto mb-2" />
+          <div className="relative w-full md:w-[560px] md:max-w-[92vw] rounded-t-3xl md:rounded-3xl bg-white/95 border-t md:border border-[#dce7f5] p-3 md:p-5 shadow-[0_-18px_36px_rgba(13,35,64,0.22)]">
+            <div className="w-10 h-1 rounded-full bg-[#d2dceb] mx-auto mb-2 md:hidden" />
             <div className="text-sm font-semibold mb-2">快速创建任务</div>
             <div className="space-y-2">
               <select

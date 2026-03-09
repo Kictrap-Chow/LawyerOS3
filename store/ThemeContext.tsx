@@ -48,9 +48,9 @@ const withAlpha = (hex: string, alpha: number) => {
 
 const fontFamilyByType: Record<ThemeFont, string> = {
   chatgpt:
-    '"Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif',
+    '"PingFang SC", "SF Pro Text", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif',
   system:
-    '"SF Pro Text", "SF Pro Display", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
+    '"SF Pro Text", "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif',
   serif:
     '"Source Han Serif SC", "Noto Serif SC", "Songti SC", "Times New Roman", serif',
 };
@@ -58,10 +58,10 @@ const fontFamilyByType: Record<ThemeFont, string> = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [preset, setPresetState] = useState<ThemePreset>('liquid-glass');
+  const [preset, setPresetState] = useState<ThemePreset>('obsidian-primary');
   const [accent, setAccentState] = useState('#1b75bb');
   const [textColor, setTextColorState] = useState('#1f2937');
-  const [font, setFontState] = useState<ThemeFont>('chatgpt');
+  const [font, setFontState] = useState<ThemeFont>('system');
 
   useEffect(() => {
     const savedPreset = localStorage.getItem(PRESET_KEY) as ThemePreset | null;

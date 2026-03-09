@@ -8,11 +8,18 @@ import { FileJson, FileUp } from 'lucide-react';
 export const Settings: React.FC = () => {
   const { lang, setLang } = useI18n();
   const { preset, setPreset, accent, setAccent, textColor, setTextColor, font, setFont } = useTheme();
-  const { appTitle, setAppTitle, isSupabaseEnabled, authLoading, isAuthenticated, userEmail, signIn, signUp, signOut, exportData, importData } = useData();
+  const {
+    appTitle, setAppTitle, isSupabaseEnabled, authLoading, isAuthenticated, userEmail, signIn, signUp, signOut,
+    exportData, importData,
+    localFileSyncSupported, localFileSyncEnabled, localFileSyncFileName, localFileSyncMessage,
+    setupLocalFileSyncByExport, bindLocalFileSyncExisting, pullFromLocalFileSync, disableLocalFileSync
+  } = useData();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+  const [localSyncActionMessage, setLocalSyncActionMessage] = useState('');
+  const [localSyncBusy, setLocalSyncBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [calendarToken, setCalendarToken] = useState(() => localStorage.getItem('calendarFeedToken') || '');
 
@@ -65,6 +72,34 @@ export const Settings: React.FC = () => {
     } finally {
       e.target.value = '';
     }
+  };
+
+  const handleSetupLocalSync = async () => {
+    setLocalSyncBusy(true);
+    const res = await setupLocalFileSyncByExport();
+    setLocalSyncBusy(false);
+    setLocalSyncActionMessage(res.message);
+  };
+
+  const handleBindExisting = async () => {
+    setLocalSyncBusy(true);
+    const res = await bindLocalFileSyncExisting();
+    setLocalSyncBusy(false);
+    setLocalSyncActionMessage(res.message);
+  };
+
+  const handlePullNow = async () => {
+    setLocalSyncBusy(true);
+    const res = await pullFromLocalFileSync();
+    setLocalSyncBusy(false);
+    setLocalSyncActionMessage(res.message);
+  };
+
+  const handleDisableLocalSync = async () => {
+    setLocalSyncBusy(true);
+    await disableLocalFileSync();
+    setLocalSyncBusy(false);
+    setLocalSyncActionMessage('已关闭自动同步。');
   };
 
   const copyCalendarUrl = async () => {
@@ -256,6 +291,54 @@ export const Settings: React.FC = () => {
             导入数据
           </button>
         </div>
+      </div>
+
+      <div className="craft-panel p-4 md:p-5 mb-4">
+        <h2 className="text-sm font-semibold tint-text uppercase mb-3">本地 JSON 同步（iCloud 友好）</h2>
+        <div className="text-xs text-gray-500 mb-2">
+          建议首次先“导出并绑定 iCloud 文件”，之后每次打开页面会自动拉取，且每次修改会自动写回同一个 JSON。
+        </div>
+        {!localFileSyncSupported && (
+          <div className="text-xs text-[#8b6b4e] mb-2">
+            当前浏览器不支持自动本地同步。请改用最新版 Chrome / Edge / Safari（iOS 17+）。
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handleSetupLocalSync}
+            disabled={!localFileSyncSupported || localSyncBusy}
+            className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+          >
+            首次导出并绑定 iCloud 文件
+          </button>
+          <button
+            onClick={handleBindExisting}
+            disabled={!localFileSyncSupported || localSyncBusy}
+            className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+          >
+            绑定已有 iCloud JSON
+          </button>
+          <button
+            onClick={handlePullNow}
+            disabled={!localFileSyncEnabled || localSyncBusy}
+            className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+          >
+            立即拉取一次
+          </button>
+          <button
+            onClick={handleDisableLocalSync}
+            disabled={!localFileSyncEnabled || localSyncBusy}
+            className="px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+          >
+            关闭自动同步
+          </button>
+        </div>
+        <div className="mt-2 text-xs text-[#6a7d93]">
+          状态：{localFileSyncEnabled ? `已启用（${localFileSyncFileName || '未命名文件'}）` : '未启用'}
+        </div>
+        {(localSyncActionMessage || localFileSyncMessage) && (
+          <div className="mt-1 text-xs text-[#6a7d93]">{localSyncActionMessage || localFileSyncMessage}</div>
+        )}
       </div>
 
       <div className="craft-panel p-4 md:p-5 mb-4">

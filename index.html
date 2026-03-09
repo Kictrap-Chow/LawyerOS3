@@ -35,12 +35,14 @@
         --ui-tint-border: rgba(27, 117, 187, 0.24);
         --ui-tint-text: #0f4a79;
         --ui-warm: #d2b08f;
-        --app-font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+        --app-font-family: "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
         
         --ui-card: rgba(255, 255, 255, 0.56);
         --ui-line: rgba(255, 255, 255, 0.62);
         --ui-glass-shadow: 0 20px 44px rgba(74, 90, 121, 0.18), 0 3px 10px rgba(91, 105, 135, 0.08);
         --ui-glass-inset: inset 0 1px 0 rgba(255,255,255,0.92), inset 0 -1px 0 rgba(255,255,255,0.42);
+        --ui-scroll-thumb: rgba(142, 122, 101, 0.34);
+        --ui-scroll-thumb-hover: rgba(128, 106, 85, 0.5);
       }
       * {
         box-sizing: border-box;
@@ -91,10 +93,18 @@
         position: relative;
         z-index: 1;
       }
-      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--ui-scroll-thumb) transparent;
+      }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #cad5e4; border-radius: 4px; }
-      ::-webkit-scrollbar-thumb:hover { background: #aab9ce; }
+      ::-webkit-scrollbar-thumb {
+        background: var(--ui-scroll-thumb);
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+      }
+      ::-webkit-scrollbar-thumb:hover { background: var(--ui-scroll-thumb-hover); }
       
       .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -211,6 +221,8 @@
         --ui-card: rgba(255, 255, 255, 0.9);
         --ui-line: rgba(215, 226, 240, 0.95);
         --ui-glass-shadow: 0 12px 30px rgba(97, 117, 148, 0.1), 0 2px 8px rgba(97, 117, 148, 0.06);
+        --ui-scroll-thumb: rgba(126, 142, 162, 0.34);
+        --ui-scroll-thumb-hover: rgba(113, 131, 153, 0.52);
       }
       :root[data-theme="craft-light"] body {
         background:
@@ -254,6 +266,8 @@
         --ui-line: rgba(214, 189, 160, 0.72);
         --ui-glass-shadow: 0 14px 28px rgba(93, 67, 41, 0.15), 0 2px 10px rgba(93, 67, 41, 0.09);
         --ui-glass-inset: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 -1px 0 rgba(255,255,255,0.28);
+        --ui-scroll-thumb: rgba(156, 120, 91, 0.34);
+        --ui-scroll-thumb-hover: rgba(138, 103, 76, 0.52);
       }
       :root[data-theme="obsidian-primary"] body {
         background:

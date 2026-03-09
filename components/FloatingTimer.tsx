@@ -4,11 +4,9 @@ import { useI18n } from '../store/I18nContext';
 import { Case, Task } from '../types';
 import { calculateTaskDuration, formatTimeDuration, nowISO } from '../utils';
 
-type CaseTaskRef = { caseId: string; taskId: string };
-
-const LAST_KEY = 'lawyer_last_timer_ref';
 const MIN_KEY = 'lawyer_timer_minimized';
 const POS_KEY = 'lawyer_timer_pos';
+const DISMISS_KEY = 'lawyer_timer_dismissed';
 
 const findRunningTask = (cases: Case[]): { c: Case; t: Task } | null => {
   let best: { c: Case; t: Task; startTs: number } | null = null;
@@ -25,14 +23,6 @@ const findRunningTask = (cases: Case[]): { c: Case; t: Task } | null => {
   return best ? { c: best.c, t: best.t } : null;
 };
 
-const findByRef = (cases: Case[], ref: CaseTaskRef | null): { c: Case; t: Task } | null => {
-  if (!ref) return null;
-  const c = cases.find((x) => x.id === ref.caseId);
-  if (!c) return null;
-  const t = (c.tasks || []).find((y) => y.id === ref.taskId);
-  return t ? { c, t } : null;
-};
-
 export const FloatingTimer: React.FC = () => {
   const { cases, updateCase } = useData();
   const { t } = useI18n();
@@ -41,10 +31,6 @@ export const FloatingTimer: React.FC = () => {
     return saved === '1';
   });
 
-  const [ref, setRef] = useState<CaseTaskRef | null>(() => {
-    const raw = localStorage.getItem(LAST_KEY);
-    try { return raw ? JSON.parse(raw) as CaseTaskRef : null; } catch { return null; }
-  });
   const [pos, setPos] = useState<{ x: number; y: number } | null>(() => {
     const raw = localStorage.getItem(POS_KEY);
     try {
@@ -53,17 +39,12 @@ export const FloatingTimer: React.FC = () => {
     } catch {}
     return null;
   });
+  const [dismissedRef, setDismissedRef] = useState<string | null>(() => localStorage.getItem(DISMISS_KEY));
 
   const current = useMemo(() => {
     const running = findRunningTask(cases);
-    if (running) {
-      const newRef = { caseId: running.c.id, taskId: running.t.id };
-      setRef(newRef);
-      localStorage.setItem(LAST_KEY, JSON.stringify(newRef));
-      return running;
-    }
-    return findByRef(cases, ref);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!running) return null;
+    return running;
   }, [cases]);
 
   const [displaySeconds, setDisplaySeconds] = useState<number>(() => {
@@ -81,19 +62,36 @@ export const FloatingTimer: React.FC = () => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const resetDefault = () => {
+    const clampPosition = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
       const cardW = minimized ? 120 : Math.min(340, w * 0.92);
       const cardH = minimized ? 44 : 112;
-      const x = Math.max(8, w - cardW - 12);
-      const y = Math.max(8, h - cardH - (w < 768 ? 90 : 16));
-      setPos((prev) => prev ?? { x, y });
+      const defaultX = Math.max(8, w - cardW - 12);
+      const defaultY = Math.max(8, h - cardH - (w < 768 ? 90 : 16));
+      setPos((prev) => {
+        if (!prev) return { x: defaultX, y: defaultY };
+        const maxX = Math.max(8, w - cardW - 8);
+        const maxY = Math.max(8, h - cardH - 8);
+        return {
+          x: Math.min(Math.max(8, prev.x), maxX),
+          y: Math.min(Math.max(8, prev.y), maxY),
+        };
+      });
     };
-    resetDefault();
-    window.addEventListener('resize', resetDefault);
-    return () => window.removeEventListener('resize', resetDefault);
-  }, [minimized, pos]);
+    clampPosition();
+    window.addEventListener('resize', clampPosition);
+    return () => window.removeEventListener('resize', clampPosition);
+  }, [minimized]);
+
+  useEffect(() => {
+    if (!current) return;
+    const currentKey = `${current.c.id}:${current.t.id}`;
+    if (dismissedRef && dismissedRef !== currentKey) {
+      setDismissedRef(null);
+      localStorage.removeItem(DISMISS_KEY);
+    }
+  }, [current, dismissedRef]);
 
   useEffect(() => {
     if (!current || !current.t.isRunning) return;
@@ -145,8 +143,14 @@ export const FloatingTimer: React.FC = () => {
   };
 
   if (!current) return null;
+  const currentKey = `${current.c.id}:${current.t.id}`;
+  if (dismissedRef === currentKey) return null;
 
   const durationStr = formatTimeDuration(displaySeconds);
+  const closeTimer = () => {
+    setDismissedRef(currentKey);
+    localStorage.setItem(DISMISS_KEY, currentKey);
+  };
 
   const onDragStart = (e: React.PointerEvent<HTMLDivElement | HTMLButtonElement>) => {
     if (typeof window === 'undefined') return;
@@ -185,26 +189,38 @@ export const FloatingTimer: React.FC = () => {
     >
       {!minimized ? (
         <div
-          className="flex items-center gap-3 px-3 md:px-4 py-2.5 md:py-3 shadow-xl rounded-2xl border border-white bg-white/88 backdrop-blur-xl w-[min(92vw,340px)] md:min-w-[280px] touch-none"
-          onPointerDown={onDragStart}
+          className="flex items-center gap-3 px-3 md:px-4 py-2.5 md:py-3 shadow-xl rounded-2xl border border-white bg-white/88 backdrop-blur-xl w-[min(92vw,340px)] md:min-w-[280px]"
         >
           <div className="flex-1">
             <div className="text-sm font-semibold truncate">{current.t.desc || t('timer.noTask')}</div>
             <div className="text-xs text-gray-500 truncate">{current.c.name}</div>
             <div className="mt-1 text-lg font-mono">{durationStr}</div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {!current.t.isRunning ? (
               <button onClick={start} className="px-3 py-1 text-sm rounded border accent-soft-bg accent-text-2 accent-border-soft">{t('timer.start')}</button>
             ) : (
               <button onClick={pause} className="px-3 py-1 text-sm rounded border accent-bg text-white accent-border">{t('timer.pause')}</button>
             )}
             <button onClick={toggleMin} className="px-2 py-1 text-xs rounded border hover:bg-gray-50">{t('timer.minimize')}</button>
+            <button
+              onClick={closeTimer}
+              className="px-2 py-1 text-xs rounded border hover:bg-gray-50"
+              title="关闭"
+            >
+              ×
+            </button>
+            <button
+              onPointerDown={onDragStart}
+              className="px-2 py-1 text-xs rounded border hover:bg-gray-50 cursor-move select-none touch-none"
+              title="拖拽移动"
+            >
+              ⋮⋮
+            </button>
           </div>
         </div>
       ) : (
         <button
-          onPointerDown={onDragStart}
           onClick={toggleMin}
           className="px-3 py-2 shadow-xl rounded-full border border-white bg-white/90 backdrop-blur-xl font-mono text-sm hover:bg-gray-50 touch-none"
           aria-label="Restore Timer"
