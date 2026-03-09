@@ -402,7 +402,7 @@ export const Settings: React.FC = () => {
             className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text"
           >
             <FileJson size={14} />
-            备份数据
+            备份数据（分模块）
           </button>
           <input
             ref={fileInputRef}

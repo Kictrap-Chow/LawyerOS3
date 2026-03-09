@@ -113,6 +113,15 @@ const isBucketNotFoundError = (error: any) => {
   return msg.includes('bucket not found') || msg.includes('not found');
 };
 
+const readableError = (error: any, fallback: string) => {
+  const direct = typeof error === 'string' ? error : typeof error?.message === 'string' ? error.message : '';
+  if (direct && direct !== '{}' && direct !== '[object Object]') return direct;
+  if (typeof error?.details === 'string' && error.details) return error.details;
+  if (typeof error?.hint === 'string' && error.hint) return error.hint;
+  if (typeof error?.code === 'string' && error.code) return `${fallback} (${error.code})`;
+  return fallback;
+};
+
 const parseLocalList = <T,>(key: string): T[] => {
   try {
     const raw = localStorage.getItem(key);
@@ -496,7 +505,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return true;
     } catch (error: any) {
       setSyncStatus('error');
-      setSyncError(error?.message || 'Supabase load failed');
+      setSyncError(readableError(error, 'Supabase load failed'));
       return false;
     }
   }, [loadFromLocal, pullSupabaseData]);
@@ -695,7 +704,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLastSyncedAt(nowISO());
     } catch (error: any) {
       setSyncStatus('error');
-      setSyncError(error?.message || 'Supabase sync failed');
+      setSyncError(readableError(error, 'Supabase sync failed'));
     }
   }, [getSupabaseLegacyRemoteMeta, pushSupabaseLegacyTables, saveToServerFile]);
 
@@ -717,8 +726,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { ok: true, message: '已立即上传：本地已强制覆盖云端。' };
     } catch (error: any) {
       setSyncStatus('error');
-      setSyncError(error?.message || 'Supabase 强制上传失败');
-      return { ok: false, message: error?.message || '强制上传失败。' };
+      const message = readableError(error, 'Supabase 强制上传失败');
+      setSyncError(message);
+      return { ok: false, message };
     }
   }, [authUser?.id, cases, parties, pushSupabaseLegacyTables, syncMode]);
 
@@ -736,8 +746,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { ok: true, message: '已立即下载：云端已强制覆盖本地。' };
     } catch (error: any) {
       setSyncStatus('error');
-      setSyncError(error?.message || 'Supabase 强制下载失败');
-      return { ok: false, message: error?.message || '强制下载失败。' };
+      const message = readableError(error, 'Supabase 强制下载失败');
+      setSyncError(message);
+      return { ok: false, message };
     }
   }, [authUser?.id, pullSupabaseData, syncMode]);
 
@@ -934,8 +945,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const importData = (jsonStr: string) => {
     try {
       const data = JSON.parse(jsonStr);
-      const importedCases = (Array.isArray(data) ? data : (data.cases || [])).map(normalizeCase);
-      const importedParties = Array.isArray(data) ? [] : (data.parties || []);
+      let importedCases: Case[] = [];
+      let importedParties: Party[] = [];
+
+      if (data?.mode === 'segmented-export' && data?.data && typeof data.data === 'object') {
+        importedCases = Object.values(data.data.cases || {}).map((item: any) => normalizeCase(item));
+        importedParties = Object.values(data.data.parties || {}) as Party[];
+      } else {
+        importedCases = (Array.isArray(data) ? data : (data.cases || [])).map(normalizeCase);
+        importedParties = Array.isArray(data) ? [] : (data.parties || []);
+      }
+
       createSnapshot('before-import', cases, parties);
       setCases(importedCases);
       setParties(importedParties);
@@ -945,11 +965,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const exportData = () => {
-    const blob = new Blob([JSON.stringify({ cases, parties }, null, 2)], { type: 'application/json' });
+    const caseMap = Object.fromEntries(cases.map((item) => [item.id, item]));
+    const partyMap = Object.fromEntries(parties.map((item) => [item.id, item]));
+    const payload = {
+      version: 2,
+      mode: 'segmented-export',
+      updatedAt: nowISO(),
+      manifest: {
+        version: 2,
+        mode: 'segmented',
+        updatedAt: nowISO(),
+        caseCount: cases.length,
+        partyCount: parties.length,
+        caseIds: cases.map((item) => item.id),
+        partyIds: parties.map((item) => item.id),
+      },
+      data: {
+        cases: caseMap,
+        parties: partyMap,
+      },
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `LawyerOS_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `LawyerOS_Backup_Segmented_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
   };
 
@@ -957,7 +997,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       return await pullFromBoundLocalFile();
     } catch (error: any) {
-      return { ok: false, message: error?.message || '本地拉取失败，请重试。' };
+      return { ok: false, message: readableError(error, '本地拉取失败，请重试。') };
     }
   }, [pullFromBoundLocalFile]);
 
