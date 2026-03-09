@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1b5e9a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="LawyerOS" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <title>LawyerOS - Case Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --ui-bg-0: #f4f7fb;
+        --ui-bg-1: #edf2f8;
+        --ui-bg-2: #e7eef6;
+        --ui-bg-3: #f7f8fa;
+        --ui-text: #16324b;
+        --ui-text-strong: #11253f;
+        --ui-text-soft: #22496d;
+        --ui-muted: #5e7288;
+        --ui-accent: #1b75bb;
+        --ui-accent-2: #11588f;
+        --ui-accent-soft: rgba(27, 117, 187, 0.12);
+        --ui-accent-soft-2: rgba(27, 117, 187, 0.2);
+        --ui-tint-bg: rgba(27, 117, 187, 0.08);
+        --ui-tint-bg-strong: rgba(27, 117, 187, 0.14);
+        --ui-tint-border: rgba(27, 117, 187, 0.24);
+        --ui-tint-text: #0f4a79;
+        --ui-warm: #d2b08f;
+        --app-font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+        
+        --ui-card: rgba(255, 255, 255, 0.56);
+        --ui-line: rgba(255, 255, 255, 0.62);
+        --ui-glass-shadow: 0 20px 44px rgba(74, 90, 121, 0.18), 0 3px 10px rgba(91, 105, 135, 0.08);
+        --ui-glass-inset: inset 0 1px 0 rgba(255,255,255,0.92), inset 0 -1px 0 rgba(255,255,255,0.42);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html, body, #root {
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        font-family: var(--app-font-family);
+        color: var(--ui-text);
+        overflow-x: hidden;
+        background:
+          radial-gradient(68rem 52rem at -8% -12%, rgba(198, 225, 255, 0.64), rgba(198, 225, 255, 0) 55%),
+          radial-gradient(66rem 46rem at 108% -6%, rgba(214, 236, 255, 0.7), rgba(214, 236, 255, 0) 56%),
+          radial-gradient(58rem 44rem at 52% 118%, rgba(253, 241, 224, 0.4), rgba(253, 241, 224, 0) 58%),
+          linear-gradient(150deg, var(--ui-bg-0) 0%, var(--ui-bg-1) 48%, var(--ui-bg-2) 80%, var(--ui-bg-3) 100%);
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(120deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04) 30%, rgba(255, 255, 255, 0.2) 62%, rgba(255, 255, 255, 0.06)),
+          radial-gradient(46rem 18rem at 12% 4%, rgba(255,255,255,0.34), rgba(255,255,255,0)),
+          radial-gradient(36rem 16rem at 84% 14%, rgba(255,255,255,0.24), rgba(255,255,255,0));
+        mix-blend-mode: screen;
+        opacity: 0.9;
+        z-index: 0;
+      }
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image: radial-gradient(rgba(255,255,255,0.14) 0.5px, transparent 0.5px);
+        background-size: 2px 2px;
+        opacity: 0.15;
+        z-index: 0;
+      }
+      #root {
+        position: relative;
+        z-index: 1;
+      }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #cad5e4; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #aab9ce; }
+      
+      .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+      }
+      .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+      }
+      
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(8px) scale(0.995); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.24s ease-out forwards;
+      }
+      .craft-surface {
+        position: relative;
+        isolation: isolate;
+        background:
+          linear-gradient(165deg, rgba(255,255,255,0.62), rgba(255,255,255,0.28)),
+          linear-gradient(120deg, rgba(255,255,255,0.34), rgba(255,255,255,0.08));
+        border: 1px solid var(--ui-line);
+        backdrop-filter: blur(24px) saturate(150%);
+        -webkit-backdrop-filter: blur(24px) saturate(150%);
+        border-radius: 22px;
+        box-shadow: var(--ui-glass-inset), var(--ui-glass-shadow);
+      }
+      .craft-surface::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        background: linear-gradient(145deg, rgba(255,255,255,0.52), rgba(255,255,255,0) 46%);
+        opacity: 0.85;
+      }
+      .craft-panel {
+        position: relative;
+        background: linear-gradient(160deg, rgba(255,255,255,0.56), rgba(255,255,255,0.24));
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 18px;
+        backdrop-filter: blur(16px) saturate(145%);
+        -webkit-backdrop-filter: blur(16px) saturate(145%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 10px 24px rgba(104, 120, 149, 0.14);
+      }
+      .craft-pill {
+        border-radius: 9999px;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .craft-tab {
+        border-radius: 9999px;
+        padding: 7px 14px;
+        color: #5f6877;
+        border: 1px solid rgba(255,255,255,0.44);
+        background: rgba(255,255,255,0.22);
+        backdrop-filter: blur(10px) saturate(140%);
+        -webkit-backdrop-filter: blur(10px) saturate(140%);
+        transition: all .2s ease;
+        cursor: pointer;
+      }
+      .craft-tab:hover {
+        background: rgba(255,255,255,0.44);
+        color: #1f2937;
+        border-color: rgba(255,255,255,0.68);
+      }
+      .craft-tab-active {
+        background: rgba(255,255,255,0.72);
+        color: #111827;
+        border-color: rgba(255,255,255,0.82);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 10px 20px rgba(88, 103, 132, 0.2);
+      }
+      .craft-input {
+        border: 1px solid #d9cfde;
+        background: rgba(255,255,255,0.92);
+        border-radius: 12px;
+      }
+      .tone-ink { color: #2B124C; }
+      .tone-soft { color: var(--ui-accent); }
+      .tone-muted { color: var(--ui-muted); }
+      .tone-accent { color: var(--ui-accent-2); }
+      .bg-accent-soft { background: var(--ui-accent-soft); }
+      .bg-warm-soft { background: var(--ui-tint-bg); }
+      .accent-bg {
+        background-image: linear-gradient(140deg, var(--ui-accent), var(--ui-accent-2)) !important;
+        box-shadow: 0 8px 18px rgba(24, 112, 95, 0.28), inset 0 1px 0 rgba(255,255,255,0.24);
+      }
+      .accent-bg-hover:hover {
+        filter: brightness(1.02);
+        transform: translateY(-0.5px);
+      }
+      .accent-text { color: var(--ui-accent) !important; }
+      .accent-text-2 { color: var(--ui-accent-2) !important; }
+      .accent-border { border-color: var(--ui-accent) !important; }
+      .accent-border-soft { border-color: var(--ui-accent-soft-2) !important; }
+      .accent-soft-bg { background: var(--ui-accent-soft) !important; }
+      .accent-gradient-bg { background-image: linear-gradient(135deg, var(--ui-accent), var(--ui-accent-2)); }
+      .text-strong-theme { color: var(--ui-text-strong) !important; }
+      .tint-bg { background: var(--ui-tint-bg) !important; }
+      .tint-bg-strong { background: var(--ui-tint-bg-strong) !important; }
+      .tint-border { border-color: var(--ui-tint-border) !important; }
+      .tint-text { color: var(--ui-tint-text) !important; }
+
+      :root[data-theme="craft-light"] {
+        --ui-bg-0: #f7f4ee;
+        --ui-bg-1: #f5f8fc;
+        --ui-bg-2: #eef3fa;
+        --ui-bg-3: #f4f5f7;
+        --ui-text: #2b124c;
+        --ui-text-strong: #1f2937;
+        --ui-muted: #6f6377;
+        --ui-card: rgba(255, 255, 255, 0.9);
+        --ui-line: rgba(215, 226, 240, 0.95);
+        --ui-glass-shadow: 0 12px 30px rgba(97, 117, 148, 0.1), 0 2px 8px rgba(97, 117, 148, 0.06);
+      }
+      :root[data-theme="craft-light"] body {
+        background:
+          radial-gradient(circle at 0% 0%, #fff6e8 0%, rgba(255, 246, 232, 0.7) 25%, rgba(255, 246, 232, 0) 52%),
+          radial-gradient(circle at 100% 0%, #eaf4ff 0%, rgba(234, 244, 255, 0.65) 30%, rgba(234, 244, 255, 0) 58%),
+          radial-gradient(circle at 50% 100%, #edf5ff 0%, rgba(237, 245, 255, 0.55) 30%, rgba(237, 245, 255, 0) 62%),
+          linear-gradient(160deg, var(--ui-bg-0) 0%, var(--ui-bg-1) 50%, var(--ui-bg-2) 100%);
+      }
+      :root[data-theme="craft-light"] body::before,
+      :root[data-theme="craft-light"] body::after {
+        opacity: 0.35;
+      }
+      :root[data-theme="craft-light"] .craft-surface {
+        backdrop-filter: blur(12px) saturate(120%);
+        -webkit-backdrop-filter: blur(12px) saturate(120%);
+        border-radius: 20px;
+      }
+      :root[data-theme="craft-light"] .craft-panel {
+        backdrop-filter: blur(8px) saturate(110%);
+        -webkit-backdrop-filter: blur(8px) saturate(110%);
+      }
+
+      :root[data-theme="obsidian-primary"] {
+        --ui-bg-0: #f8f3ea;
+        --ui-bg-1: #f3ecdf;
+        --ui-bg-2: #ebe1d1;
+        --ui-bg-3: #e2d3bf;
+        --ui-text: #4a3728;
+        --ui-text-strong: #3b2a1f;
+        --ui-text-soft: #6b4f3c;
+        --ui-muted: #8f7a65;
+        --ui-accent: #be7642;
+        --ui-accent-2: #a66436;
+        --ui-accent-soft: rgba(190, 118, 66, 0.16);
+        --ui-accent-soft-2: rgba(190, 118, 66, 0.24);
+        --ui-tint-bg: rgba(190, 118, 66, 0.1);
+        --ui-tint-bg-strong: rgba(190, 118, 66, 0.16);
+        --ui-tint-border: rgba(190, 118, 66, 0.3);
+        --ui-tint-text: #8a532f;
+        --ui-card: rgba(252, 246, 237, 0.74);
+        --ui-line: rgba(214, 189, 160, 0.72);
+        --ui-glass-shadow: 0 14px 28px rgba(93, 67, 41, 0.15), 0 2px 10px rgba(93, 67, 41, 0.09);
+        --ui-glass-inset: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 -1px 0 rgba(255,255,255,0.28);
+      }
+      :root[data-theme="obsidian-primary"] body {
+        background:
+          radial-gradient(70rem 44rem at -10% -8%, rgba(255, 236, 206, 0.72), rgba(255, 236, 206, 0) 58%),
+          radial-gradient(60rem 34rem at 105% -5%, rgba(242, 215, 183, 0.66), rgba(242, 215, 183, 0) 62%),
+          radial-gradient(52rem 30rem at 52% 112%, rgba(214, 176, 142, 0.35), rgba(214, 176, 142, 0) 64%),
+          linear-gradient(155deg, var(--ui-bg-0) 0%, var(--ui-bg-1) 48%, var(--ui-bg-2) 83%, var(--ui-bg-3) 100%);
+      }
+      :root[data-theme="obsidian-primary"] body::before {
+        opacity: 0.6;
+      }
+      :root[data-theme="obsidian-primary"] body::after {
+        opacity: 0.08;
+      }
+      :root[data-theme="obsidian-primary"] .craft-surface {
+        background:
+          linear-gradient(165deg, rgba(255,255,255,0.58), rgba(247,237,226,0.48)),
+          linear-gradient(130deg, rgba(255,255,255,0.32), rgba(246,227,206,0.12));
+        border: 1px solid rgba(214, 189, 160, 0.8);
+        backdrop-filter: blur(10px) saturate(112%);
+        -webkit-backdrop-filter: blur(10px) saturate(112%);
+        box-shadow: var(--ui-glass-inset), var(--ui-glass-shadow);
+      }
+      :root[data-theme="obsidian-primary"] .craft-panel {
+        background: linear-gradient(160deg, rgba(255,250,244,0.66), rgba(243,229,211,0.5));
+        border: 1px solid rgba(214, 189, 160, 0.75);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.65), 0 8px 22px rgba(93, 67, 41, 0.12);
+      }
+      :root[data-theme="obsidian-primary"] .craft-tab {
+        color: #73563f;
+        border: 1px solid rgba(214, 189, 160, 0.65);
+        background: rgba(255, 248, 238, 0.44);
+      }
+      :root[data-theme="obsidian-primary"] .craft-tab:hover {
+        color: #4b3526;
+        background: rgba(255, 248, 238, 0.74);
+        border-color: rgba(214, 189, 160, 0.86);
+      }
+      :root[data-theme="obsidian-primary"] .craft-tab-active {
+        color: #3b2a1f;
+        background: rgba(255, 249, 241, 0.9);
+        border-color: rgba(202, 171, 139, 0.95);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 8px 16px rgba(93, 67, 41, 0.14);
+      }
+
+      .craft-surface,
+      .craft-panel {
+        transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+      }
+      .craft-panel:hover {
+        border-color: rgba(255, 255, 255, 0.78);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.88), 0 14px 30px rgba(15, 50, 90, 0.16);
+      }
+      .accent-bg {
+        letter-spacing: 0.01em;
+      }
+      @keyframes breatheGlow {
+        0%, 100% { box-shadow: 0 10px 22px rgba(22, 96, 155, 0.22), inset 0 1px 0 rgba(255,255,255,0.24); }
+        50% { box-shadow: 0 14px 26px rgba(22, 96, 155, 0.32), inset 0 1px 0 rgba(255,255,255,0.35); }
+      }
+      .accent-bg:hover {
+        animation: breatheGlow 1.2s ease-in-out infinite;
+      }
+
+      @media (max-width: 768px) {
+        input,
+        select,
+        textarea {
+          font-size: 16px !important;
+        }
+        body {
+          background:
+            radial-gradient(30rem 22rem at 8% -6%, rgba(202, 228, 255, 0.75), rgba(202, 228, 255, 0) 58%),
+            radial-gradient(28rem 18rem at 100% -2%, rgba(236, 245, 255, 0.86), rgba(236, 245, 255, 0) 60%),
+            linear-gradient(165deg, #f4f7fb 0%, #ecf2f9 54%, #f8f8f7 100%);
+        }
+        .craft-surface {
+          backdrop-filter: blur(18px) saturate(135%);
+          -webkit-backdrop-filter: blur(18px) saturate(135%);
+        }
+      }
+      @supports not ((backdrop-filter: blur(1px))) {
+        .craft-surface, .craft-panel, .craft-tab {
+          background: rgba(255,255,255,0.9);
+        }
+      }
+    </style>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

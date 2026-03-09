@@ -1,0 +1,13 @@
+version: '3'
+services:
+  lawyeros:
+    build: .
+    image: lawyeros:latest
+    container_name: lawyeros
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=3000
