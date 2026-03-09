@@ -10,6 +10,7 @@ export const Settings: React.FC = () => {
   const { preset, setPreset, accent, setAccent, textColor, setTextColor, font, setFont } = useTheme();
   const {
     isSupabaseEnabled, authLoading, isAuthenticated, userEmail, syncMode, setSyncMode, signIn, signUp, signOut,
+    forceUploadToSupabaseNow, forceDownloadFromSupabaseNow,
     exportData, importData,
     localFileSyncSupported, localFileSyncEnabled, localFileSyncKind, localFileSyncFileName, localFileSyncMessage,
     setupLocalFileSyncByFolder, setupLocalFileSyncByExport, bindLocalFileSyncExisting, pullFromLocalFileSync, flushLocalFileSyncNow, disableLocalFileSync
@@ -18,6 +19,7 @@ export const Settings: React.FC = () => {
   const [password, setPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+  const [onlineSyncActionMessage, setOnlineSyncActionMessage] = useState('');
   const [localSyncActionMessage, setLocalSyncActionMessage] = useState('');
   const [localSyncBusy, setLocalSyncBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +60,20 @@ export const Settings: React.FC = () => {
     await signOut();
     setAuthBusy(false);
     setAuthMessage('已退出登录。');
+  };
+
+  const handleForceUploadNow = async () => {
+    setAuthBusy(true);
+    const res = await forceUploadToSupabaseNow();
+    setAuthBusy(false);
+    setOnlineSyncActionMessage(res.message);
+  };
+
+  const handleForceDownloadNow = async () => {
+    setAuthBusy(true);
+    const res = await forceDownloadFromSupabaseNow();
+    setAuthBusy(false);
+    setOnlineSyncActionMessage(res.message);
   };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -236,6 +252,11 @@ export const Settings: React.FC = () => {
         {syncMode === 'online' && !isSupabaseEnabled && (
           <div className="text-sm text-gray-500">当前未配置云端同步环境变量，在线同步不可用。</div>
         )}
+        {syncMode === 'online' && isSupabaseEnabled && (
+          <div className="text-xs text-[#6a7d93] mb-2">
+            联网模式使用 Supabase 分模块同步：`manifest + cases + parties`（Storage 文件结构）。
+          </div>
+        )}
         {syncMode === 'online' && isSupabaseEnabled && authLoading && (
           <div className="text-sm text-gray-500">正在检查登录状态...</div>
         )}
@@ -277,7 +298,24 @@ export const Settings: React.FC = () => {
         {syncMode === 'online' && isSupabaseEnabled && !authLoading && isAuthenticated && (
           <div className="space-y-2">
             <div className="text-sm text-gray-600">当前登录：<span className="font-medium text-strong-theme">{userEmail}</span></div>
-            <button disabled={authBusy} onClick={handleSignOut} className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60">退出登录</button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled={authBusy}
+                onClick={handleForceUploadNow}
+                className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60"
+              >
+                立即上传（覆盖云端）
+              </button>
+              <button
+                disabled={authBusy}
+                onClick={handleForceDownloadNow}
+                className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60"
+              >
+                立即下载（覆盖本地）
+              </button>
+              <button disabled={authBusy} onClick={handleSignOut} className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60">退出登录</button>
+            </div>
+            {onlineSyncActionMessage && <div className="text-xs text-[#6a7d93]">{onlineSyncActionMessage}</div>}
             {authMessage && <div className="text-xs text-gray-500">{authMessage}</div>}
           </div>
         )}

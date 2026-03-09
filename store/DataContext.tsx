@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Case, Party } from '../types';
 import { nowISO } from '../utils';
-import { isSupabaseConfigured, supabase } from './supabase';
+import { isSupabaseConfigured, supabase, supabaseSyncBucket } from './supabase';
 import { User } from '@supabase/supabase-js';
 import {
   canReadWriteTarget,
@@ -20,6 +20,11 @@ import {
   writePayloadToTarget,
   type LocalSyncTarget,
 } from './localFileSync';
+import {
+  pullSupabaseSegmented,
+  pushSupabaseSegmented,
+  readSupabaseSegmentedManifestMeta,
+} from './supabaseSegmentedSync';
 
 interface DataContextType {
   cases: Case[];
@@ -46,6 +51,8 @@ interface DataContextType {
   signIn: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   signUp: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   signOut: () => Promise<void>;
+  forceUploadToSupabaseNow: () => Promise<{ ok: boolean; message: string }>;
+  forceDownloadFromSupabaseNow: () => Promise<{ ok: boolean; message: string }>;
   localFileSyncSupported: boolean;
   localFileSyncEnabled: boolean;
   localFileSyncFileName: string | null;
@@ -141,6 +148,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const saveTimerRef = useRef<number | null>(null);
   const localFileSaveTimerRef = useRef<number | null>(null);
   const reloadTimerRef = useRef<number | null>(null);
+  const remotePollTimerRef = useRef<number | null>(null);
   const lastAutoSnapshotAtRef = useRef(0);
   const localSyncTargetRef = useRef<LocalSyncTarget | null>(null);
   const mutationDuringBootstrapRef = useRef(false);
@@ -181,10 +189,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const hasAnyData = (nextCases: Case[], nextParties: Party[]) => nextCases.length > 0 || nextParties.length > 0;
-  const latestLocalDataTs = (nextCases: Case[]) => {
+  const latestLocalDataTs = (nextCases: Case[], nextParties: Party[]) => {
     let latest = 0;
     for (const item of nextCases) {
       const ts = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
+      if (Number.isFinite(ts) && ts > latest) latest = ts;
+    }
+    for (const item of nextParties) {
+      const ts = (item as any)?.updatedAt ? new Date((item as any).updatedAt).getTime() : 0;
       if (Number.isFinite(ts) && ts > latest) latest = ts;
     }
     return latest;
@@ -354,20 +366,41 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [syncMode]);
 
-  const loadFromSupabase = useCallback(async (ownerId: string) => {
-    if (!supabase || !ownerId) return false;
-    try {
-      setSyncStatus('syncing');
+  const pullSupabaseData = useCallback(async (ownerId: string) => {
+    if (!supabase || !ownerId) return { cases: [] as Case[], parties: [] as Party[] };
+    let nextCases: Case[] = [];
+    let nextParties: Party[] = [];
+    const segmented = await pullSupabaseSegmented(supabase, supabaseSyncBucket, ownerId);
+    nextCases = segmented.cases.map(normalizeCase);
+    nextParties = segmented.parties as Party[];
+
+    // Compatibility fallback: if segmented bucket has no data, read legacy tables once.
+    if (nextCases.length === 0 && nextParties.length === 0 && !segmented.hasRemoteData) {
       const [casesRes, partiesRes] = await Promise.all([
         supabase.from('cases').select('id,data').eq('owner_id', ownerId).order('updated_at', { ascending: false }),
         supabase.from('parties').select('id,data').eq('owner_id', ownerId).order('updated_at', { ascending: false }),
       ]);
-
       if (casesRes.error) throw casesRes.error;
       if (partiesRes.error) throw partiesRes.error;
+      nextCases = (casesRes.data || []).map((row: any) => normalizeCase({ ...(row.data || {}), id: row.id }));
+      nextParties = (partiesRes.data || []).map((row: any) => ({ ...(row.data || {}), id: row.id } as Party));
 
-      const nextCases = (casesRes.data || []).map((row: any) => normalizeCase({ ...(row.data || {}), id: row.id }));
-      const nextParties = (partiesRes.data || []).map((row: any) => ({ ...(row.data || {}), id: row.id } as Party));
+      if (nextCases.length > 0 || nextParties.length > 0) {
+        await pushSupabaseSegmented(supabase, supabaseSyncBucket, ownerId, {
+          cases: nextCases,
+          parties: nextParties,
+        });
+      }
+    }
+
+    return { cases: nextCases, parties: nextParties };
+  }, []);
+
+  const loadFromSupabase = useCallback(async (ownerId: string) => {
+    if (!supabase || !ownerId) return false;
+    try {
+      setSyncStatus('syncing');
+      const { cases: nextCases, parties: nextParties } = await pullSupabaseData(ownerId);
 
       const localCaseCount = parseLocalList<Case>(APP_KEY_CASES).length;
       const localPartyCount = parseLocalList<Party>(APP_KEY_PARTIES).length;
@@ -390,7 +423,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSyncError(error?.message || 'Supabase load failed');
       return false;
     }
-  }, [loadFromLocal]);
+  }, [loadFromLocal, pullSupabaseData]);
 
   useEffect(() => {
     if (syncMode !== 'online') {
@@ -530,13 +563,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Safety guard: never let empty local data erase non-empty cloud data automatically.
       if (nextCases.length === 0 && nextParties.length === 0) {
-        const [caseCountRes, partyCountRes] = await Promise.all([
-          supabase.from('cases').select('id', { head: true, count: 'exact' }).eq('owner_id', ownerId),
-          supabase.from('parties').select('id', { head: true, count: 'exact' }).eq('owner_id', ownerId),
-        ]);
-        if (caseCountRes.error) throw caseCountRes.error;
-        if (partyCountRes.error) throw partyCountRes.error;
-        const remoteCount = (caseCountRes.count || 0) + (partyCountRes.count || 0);
+        const manifestMeta = await readSupabaseSegmentedManifestMeta(supabase, supabaseSyncBucket, ownerId);
+        const remoteCount = (manifestMeta?.caseCount || 0) + (manifestMeta?.partyCount || 0);
         if (remoteCount > 0) {
           setSyncStatus('error');
           setSyncError('已阻止空数据覆盖云端。请先从备份恢复或确认账号后再操作。');
@@ -545,17 +573,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Freshness guard: do not allow older local data to overwrite newer cloud data.
-      const [remoteCaseLatestRes, remotePartyLatestRes] = await Promise.all([
-        supabase.from('cases').select('updated_at').eq('owner_id', ownerId).order('updated_at', { ascending: false }).limit(1),
-        supabase.from('parties').select('updated_at').eq('owner_id', ownerId).order('updated_at', { ascending: false }).limit(1),
-      ]);
-      if (remoteCaseLatestRes.error) throw remoteCaseLatestRes.error;
-      if (remotePartyLatestRes.error) throw remotePartyLatestRes.error;
-
-      const remoteCaseTs = remoteCaseLatestRes.data?.[0]?.updated_at ? new Date(remoteCaseLatestRes.data[0].updated_at).getTime() : 0;
-      const remotePartyTs = remotePartyLatestRes.data?.[0]?.updated_at ? new Date(remotePartyLatestRes.data[0].updated_at).getTime() : 0;
-      const remoteLatest = Math.max(remoteCaseTs || 0, remotePartyTs || 0);
-      const localLatest = latestLocalDataTs(nextCases);
+      const manifestMeta = await readSupabaseSegmentedManifestMeta(supabase, supabaseSyncBucket, ownerId);
+      const remoteLatest = manifestMeta?.updatedAt ? new Date(manifestMeta.updatedAt).getTime() : 0;
+      const localLatest = latestLocalDataTs(nextCases, nextParties);
 
       if (remoteLatest > 0 && localLatest > 0 && localLatest + 1000 < remoteLatest) {
         setSyncStatus('error');
@@ -563,41 +583,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      const { error: caseUpsertError } = await supabase.from('cases').upsert(
-        nextCases.map((item) => ({ id: item.id, owner_id: ownerId, data: item })),
-        { onConflict: 'id' }
-      );
-      if (caseUpsertError) throw caseUpsertError;
-
-      const { error: partyUpsertError } = await supabase.from('parties').upsert(
-        nextParties.map((item) => ({ id: item.id, owner_id: ownerId, data: item })),
-        { onConflict: 'id' }
-      );
-      if (partyUpsertError) throw partyUpsertError;
-
-      const [caseIdsRes, partyIdsRes] = await Promise.all([
-        supabase.from('cases').select('id').eq('owner_id', ownerId),
-        supabase.from('parties').select('id').eq('owner_id', ownerId),
-      ]);
-
-      if (caseIdsRes.error) throw caseIdsRes.error;
-      if (partyIdsRes.error) throw partyIdsRes.error;
-
-      const caseIdSet = new Set(nextCases.map((item) => item.id));
-      const partyIdSet = new Set(nextParties.map((item) => item.id));
-
-      const staleCaseIds = (caseIdsRes.data || []).map((row) => row.id).filter((id) => !caseIdSet.has(id));
-      const stalePartyIds = (partyIdsRes.data || []).map((row) => row.id).filter((id) => !partyIdSet.has(id));
-
-      if (staleCaseIds.length > 0) {
-        const { error } = await supabase.from('cases').delete().eq('owner_id', ownerId).in('id', staleCaseIds);
-        if (error) throw error;
-      }
-
-      if (stalePartyIds.length > 0) {
-        const { error } = await supabase.from('parties').delete().eq('owner_id', ownerId).in('id', stalePartyIds);
-        if (error) throw error;
-      }
+      await pushSupabaseSegmented(supabase, supabaseSyncBucket, ownerId, {
+        cases: nextCases,
+        parties: nextParties,
+      });
 
       setSyncStatus('online');
       setSyncError(null);
@@ -607,6 +596,43 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSyncError(error?.message || 'Supabase sync failed');
     }
   }, [saveToServerFile]);
+
+  const forceUploadToSupabaseNow = useCallback(async () => {
+    if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
+    if (!supabase || !isSupabaseConfigured) return { ok: false, message: '云端同步未配置。' };
+    if (!authUser?.id) return { ok: false, message: '请先登录 Supabase。' };
+    try {
+      setSyncStatus('syncing');
+      await pushSupabaseSegmented(supabase, supabaseSyncBucket, authUser.id, { cases, parties });
+      setSyncStatus('online');
+      setSyncError(null);
+      setLastSyncedAt(nowISO());
+      return { ok: true, message: '已立即上传：本地已强制覆盖云端。' };
+    } catch (error: any) {
+      setSyncStatus('error');
+      setSyncError(error?.message || 'Supabase 强制上传失败');
+      return { ok: false, message: error?.message || '强制上传失败。' };
+    }
+  }, [authUser?.id, cases, parties, syncMode]);
+
+  const forceDownloadFromSupabaseNow = useCallback(async () => {
+    if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
+    if (!supabase || !isSupabaseConfigured) return { ok: false, message: '云端同步未配置。' };
+    if (!authUser?.id) return { ok: false, message: '请先登录 Supabase。' };
+    try {
+      setSyncStatus('syncing');
+      const { cases: remoteCases, parties: remoteParties } = await pullSupabaseData(authUser.id);
+      applyDataset(remoteCases, remoteParties, true);
+      setSyncStatus('online');
+      setSyncError(null);
+      setLastSyncedAt(nowISO());
+      return { ok: true, message: '已立即下载：云端已强制覆盖本地。' };
+    } catch (error: any) {
+      setSyncStatus('error');
+      setSyncError(error?.message || 'Supabase 强制下载失败');
+      return { ok: false, message: error?.message || '强制下载失败。' };
+    }
+  }, [authUser?.id, pullSupabaseData, syncMode]);
 
   useEffect(() => {
     localStorage.setItem(APP_KEY_CASES, JSON.stringify(cases));
@@ -669,24 +695,37 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!authUser?.id) return;
 
-    const refreshFromRemote = () => {
-      if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
-      reloadTimerRef.current = window.setTimeout(() => {
-        void loadFromSupabase(authUser.id);
-      }, 300);
+    const refreshFromRemote = async () => {
+      const meta = await readSupabaseSegmentedManifestMeta(supabase, supabaseSyncBucket, authUser.id);
+      if (!meta?.updatedAt) return;
+      const remoteTs = new Date(meta.updatedAt).getTime();
+      const localTs = lastSyncedAt ? new Date(lastSyncedAt).getTime() : 0;
+      if (remoteTs > localTs + 500) {
+        if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+        reloadTimerRef.current = window.setTimeout(() => {
+          void loadFromSupabase(authUser.id);
+        }, 300);
+      }
     };
 
-    const channel = supabase
-      .channel('lawyeros-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cases', filter: `owner_id=eq.${authUser.id}` }, refreshFromRemote)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'parties', filter: `owner_id=eq.${authUser.id}` }, refreshFromRemote)
-      .subscribe();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshFromRemote();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onVisibility);
+    remotePollTimerRef.current = window.setInterval(() => {
+      void refreshFromRemote();
+    }, 15000);
 
     return () => {
       if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
-      void supabase.removeChannel(channel);
+      if (remotePollTimerRef.current) window.clearInterval(remotePollTimerRef.current);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onVisibility);
     };
-  }, [authUser?.id, loadFromSupabase, syncMode]);
+  }, [authUser?.id, lastSyncedAt, loadFromSupabase, syncMode]);
 
   useEffect(() => {
     if (!localFileSyncEnabled || !localFileSyncSupported || !isBootstrapped) return;
@@ -835,6 +874,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signUp,
         signOut,
+        forceUploadToSupabaseNow,
+        forceDownloadFromSupabaseNow,
         localFileSyncSupported,
         localFileSyncEnabled,
         localFileSyncKind,
