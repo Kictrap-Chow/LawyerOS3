@@ -108,6 +108,11 @@ const normalizeCase = (item: any): Case => ({
   opponents: Array.isArray(item?.opponents) ? item.opponents : [],
 });
 
+const isBucketNotFoundError = (error: any) => {
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('bucket not found') || msg.includes('not found');
+};
+
 const parseLocalList = <T,>(key: string): T[] => {
   try {
     const raw = localStorage.getItem(key);
@@ -366,35 +371,106 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [syncMode]);
 
-  const pullSupabaseData = useCallback(async (ownerId: string) => {
-    if (!supabase || !ownerId) return { cases: [] as Case[], parties: [] as Party[] };
-    let nextCases: Case[] = [];
-    let nextParties: Party[] = [];
-    const segmented = await pullSupabaseSegmented(supabase, supabaseSyncBucket, ownerId);
-    nextCases = segmented.cases.map(normalizeCase);
-    nextParties = segmented.parties as Party[];
-
-    // Compatibility fallback: if segmented bucket has no data, read legacy tables once.
-    if (nextCases.length === 0 && nextParties.length === 0 && !segmented.hasRemoteData) {
-      const [casesRes, partiesRes] = await Promise.all([
-        supabase.from('cases').select('id,data').eq('owner_id', ownerId).order('updated_at', { ascending: false }),
-        supabase.from('parties').select('id,data').eq('owner_id', ownerId).order('updated_at', { ascending: false }),
-      ]);
-      if (casesRes.error) throw casesRes.error;
-      if (partiesRes.error) throw partiesRes.error;
-      nextCases = (casesRes.data || []).map((row: any) => normalizeCase({ ...(row.data || {}), id: row.id }));
-      nextParties = (partiesRes.data || []).map((row: any) => ({ ...(row.data || {}), id: row.id } as Party));
-
-      if (nextCases.length > 0 || nextParties.length > 0) {
-        await pushSupabaseSegmented(supabase, supabaseSyncBucket, ownerId, {
-          cases: nextCases,
-          parties: nextParties,
-        });
-      }
-    }
-
+  const pullSupabaseLegacyTables = useCallback(async (ownerId: string) => {
+    if (!supabase) return { cases: [] as Case[], parties: [] as Party[] };
+    const [casesRes, partiesRes] = await Promise.all([
+      supabase.from('cases').select('id,data').eq('owner_id', ownerId).order('updated_at', { ascending: false }),
+      supabase.from('parties').select('id,data').eq('owner_id', ownerId).order('updated_at', { ascending: false }),
+    ]);
+    if (casesRes.error) throw casesRes.error;
+    if (partiesRes.error) throw partiesRes.error;
+    const nextCases = (casesRes.data || []).map((row: any) => normalizeCase({ ...(row.data || {}), id: row.id }));
+    const nextParties = (partiesRes.data || []).map((row: any) => ({ ...(row.data || {}), id: row.id } as Party));
     return { cases: nextCases, parties: nextParties };
   }, []);
+
+  const getSupabaseLegacyRemoteMeta = useCallback(async (ownerId: string) => {
+    if (!supabase) return { count: 0, latestTs: 0 };
+    const [caseCountRes, partyCountRes] = await Promise.all([
+      supabase.from('cases').select('id', { head: true, count: 'exact' }).eq('owner_id', ownerId),
+      supabase.from('parties').select('id', { head: true, count: 'exact' }).eq('owner_id', ownerId),
+    ]);
+    if (caseCountRes.error) throw caseCountRes.error;
+    if (partyCountRes.error) throw partyCountRes.error;
+    const [remoteCaseLatestRes, remotePartyLatestRes] = await Promise.all([
+      supabase.from('cases').select('updated_at').eq('owner_id', ownerId).order('updated_at', { ascending: false }).limit(1),
+      supabase.from('parties').select('updated_at').eq('owner_id', ownerId).order('updated_at', { ascending: false }).limit(1),
+    ]);
+    if (remoteCaseLatestRes.error) throw remoteCaseLatestRes.error;
+    if (remotePartyLatestRes.error) throw remotePartyLatestRes.error;
+    const remoteCaseTs = remoteCaseLatestRes.data?.[0]?.updated_at ? new Date(remoteCaseLatestRes.data[0].updated_at).getTime() : 0;
+    const remotePartyTs = remotePartyLatestRes.data?.[0]?.updated_at ? new Date(remotePartyLatestRes.data[0].updated_at).getTime() : 0;
+    return {
+      count: (caseCountRes.count || 0) + (partyCountRes.count || 0),
+      latestTs: Math.max(remoteCaseTs || 0, remotePartyTs || 0),
+    };
+  }, []);
+
+  const pushSupabaseLegacyTables = useCallback(async (nextCases: Case[], nextParties: Party[], ownerId: string) => {
+    if (!supabase) return;
+    const { error: caseUpsertError } = await supabase.from('cases').upsert(
+      nextCases.map((item) => ({ id: item.id, owner_id: ownerId, data: item })),
+      { onConflict: 'id' }
+    );
+    if (caseUpsertError) throw caseUpsertError;
+
+    const { error: partyUpsertError } = await supabase.from('parties').upsert(
+      nextParties.map((item) => ({ id: item.id, owner_id: ownerId, data: item })),
+      { onConflict: 'id' }
+    );
+    if (partyUpsertError) throw partyUpsertError;
+
+    const [caseIdsRes, partyIdsRes] = await Promise.all([
+      supabase.from('cases').select('id').eq('owner_id', ownerId),
+      supabase.from('parties').select('id').eq('owner_id', ownerId),
+    ]);
+
+    if (caseIdsRes.error) throw caseIdsRes.error;
+    if (partyIdsRes.error) throw partyIdsRes.error;
+
+    const caseIdSet = new Set(nextCases.map((item) => item.id));
+    const partyIdSet = new Set(nextParties.map((item) => item.id));
+
+    const staleCaseIds = (caseIdsRes.data || []).map((row) => row.id).filter((id) => !caseIdSet.has(id));
+    const stalePartyIds = (partyIdsRes.data || []).map((row) => row.id).filter((id) => !partyIdSet.has(id));
+
+    if (staleCaseIds.length > 0) {
+      const { error } = await supabase.from('cases').delete().eq('owner_id', ownerId).in('id', staleCaseIds);
+      if (error) throw error;
+    }
+
+    if (stalePartyIds.length > 0) {
+      const { error } = await supabase.from('parties').delete().eq('owner_id', ownerId).in('id', stalePartyIds);
+      if (error) throw error;
+    }
+  }, []);
+
+  const pullSupabaseData = useCallback(async (ownerId: string) => {
+    if (!supabase || !ownerId) return { cases: [] as Case[], parties: [] as Party[] };
+    try {
+      let nextCases: Case[] = [];
+      let nextParties: Party[] = [];
+      const segmented = await pullSupabaseSegmented(supabase, supabaseSyncBucket, ownerId);
+      nextCases = segmented.cases.map(normalizeCase);
+      nextParties = segmented.parties as Party[];
+
+      if (nextCases.length === 0 && nextParties.length === 0 && !segmented.hasRemoteData) {
+        const legacy = await pullSupabaseLegacyTables(ownerId);
+        nextCases = legacy.cases;
+        nextParties = legacy.parties;
+        if (nextCases.length > 0 || nextParties.length > 0) {
+          await pushSupabaseSegmented(supabase, supabaseSyncBucket, ownerId, {
+            cases: nextCases,
+            parties: nextParties,
+          });
+        }
+      }
+      return { cases: nextCases, parties: nextParties };
+    } catch (error: any) {
+      if (!isBucketNotFoundError(error)) throw error;
+      return pullSupabaseLegacyTables(ownerId);
+    }
+  }, [pullSupabaseLegacyTables]);
 
   const loadFromSupabase = useCallback(async (ownerId: string) => {
     if (!supabase || !ownerId) return false;
@@ -560,11 +636,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       setSyncStatus('syncing');
+      let useLegacy = false;
+      let remoteCount = 0;
+      let remoteLatest = 0;
 
       // Safety guard: never let empty local data erase non-empty cloud data automatically.
       if (nextCases.length === 0 && nextParties.length === 0) {
-        const manifestMeta = await readSupabaseSegmentedManifestMeta(supabase, supabaseSyncBucket, ownerId);
-        const remoteCount = (manifestMeta?.caseCount || 0) + (manifestMeta?.partyCount || 0);
+        try {
+          const manifestMeta = await readSupabaseSegmentedManifestMeta(supabase, supabaseSyncBucket, ownerId);
+          remoteCount = (manifestMeta?.caseCount || 0) + (manifestMeta?.partyCount || 0);
+        } catch (error: any) {
+          if (!isBucketNotFoundError(error)) throw error;
+          useLegacy = true;
+          const legacyMeta = await getSupabaseLegacyRemoteMeta(ownerId);
+          remoteCount = legacyMeta.count;
+        }
         if (remoteCount > 0) {
           setSyncStatus('error');
           setSyncError('已阻止空数据覆盖云端。请先从备份恢复或确认账号后再操作。');
@@ -573,8 +659,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Freshness guard: do not allow older local data to overwrite newer cloud data.
-      const manifestMeta = await readSupabaseSegmentedManifestMeta(supabase, supabaseSyncBucket, ownerId);
-      const remoteLatest = manifestMeta?.updatedAt ? new Date(manifestMeta.updatedAt).getTime() : 0;
+      if (!useLegacy) {
+        try {
+          const manifestMeta = await readSupabaseSegmentedManifestMeta(supabase, supabaseSyncBucket, ownerId);
+          remoteLatest = manifestMeta?.updatedAt ? new Date(manifestMeta.updatedAt).getTime() : 0;
+        } catch (error: any) {
+          if (!isBucketNotFoundError(error)) throw error;
+          useLegacy = true;
+          const legacyMeta = await getSupabaseLegacyRemoteMeta(ownerId);
+          remoteLatest = legacyMeta.latestTs;
+        }
+      } else {
+        const legacyMeta = await getSupabaseLegacyRemoteMeta(ownerId);
+        remoteLatest = legacyMeta.latestTs;
+      }
       const localLatest = latestLocalDataTs(nextCases, nextParties);
 
       if (remoteLatest > 0 && localLatest > 0 && localLatest + 1000 < remoteLatest) {
@@ -583,10 +681,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      await pushSupabaseSegmented(supabase, supabaseSyncBucket, ownerId, {
-        cases: nextCases,
-        parties: nextParties,
-      });
+      if (useLegacy) {
+        await pushSupabaseLegacyTables(nextCases, nextParties, ownerId);
+      } else {
+        await pushSupabaseSegmented(supabase, supabaseSyncBucket, ownerId, {
+          cases: nextCases,
+          parties: nextParties,
+        });
+      }
 
       setSyncStatus('online');
       setSyncError(null);
@@ -595,7 +697,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSyncStatus('error');
       setSyncError(error?.message || 'Supabase sync failed');
     }
-  }, [saveToServerFile]);
+  }, [getSupabaseLegacyRemoteMeta, pushSupabaseLegacyTables, saveToServerFile]);
 
   const forceUploadToSupabaseNow = useCallback(async () => {
     if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
@@ -603,7 +705,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!authUser?.id) return { ok: false, message: '请先登录 Supabase。' };
     try {
       setSyncStatus('syncing');
-      await pushSupabaseSegmented(supabase, supabaseSyncBucket, authUser.id, { cases, parties });
+      try {
+        await pushSupabaseSegmented(supabase, supabaseSyncBucket, authUser.id, { cases, parties });
+      } catch (error: any) {
+        if (!isBucketNotFoundError(error)) throw error;
+        await pushSupabaseLegacyTables(cases, parties, authUser.id);
+      }
       setSyncStatus('online');
       setSyncError(null);
       setLastSyncedAt(nowISO());
@@ -613,7 +720,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSyncError(error?.message || 'Supabase 强制上传失败');
       return { ok: false, message: error?.message || '强制上传失败。' };
     }
-  }, [authUser?.id, cases, parties, syncMode]);
+  }, [authUser?.id, cases, parties, pushSupabaseLegacyTables, syncMode]);
 
   const forceDownloadFromSupabaseNow = useCallback(async () => {
     if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
@@ -696,9 +803,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!authUser?.id) return;
 
     const refreshFromRemote = async () => {
-      const meta = await readSupabaseSegmentedManifestMeta(supabase, supabaseSyncBucket, authUser.id);
-      if (!meta?.updatedAt) return;
-      const remoteTs = new Date(meta.updatedAt).getTime();
+      let remoteTs = 0;
+      try {
+        const meta = await readSupabaseSegmentedManifestMeta(supabase, supabaseSyncBucket, authUser.id);
+        remoteTs = meta?.updatedAt ? new Date(meta.updatedAt).getTime() : 0;
+      } catch (error: any) {
+        if (!isBucketNotFoundError(error)) return;
+        const legacyMeta = await getSupabaseLegacyRemoteMeta(authUser.id);
+        remoteTs = legacyMeta.latestTs;
+      }
+      if (!remoteTs) return;
       const localTs = lastSyncedAt ? new Date(lastSyncedAt).getTime() : 0;
       if (remoteTs > localTs + 500) {
         if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
@@ -725,7 +839,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onVisibility);
     };
-  }, [authUser?.id, lastSyncedAt, loadFromSupabase, syncMode]);
+  }, [authUser?.id, getSupabaseLegacyRemoteMeta, lastSyncedAt, loadFromSupabase, syncMode]);
 
   useEffect(() => {
     if (!localFileSyncEnabled || !localFileSyncSupported || !isBootstrapped) return;
