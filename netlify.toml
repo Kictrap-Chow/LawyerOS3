@@ -9,6 +9,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/cos/pull"
+  to = "/.netlify/functions/cos-pull"
+  status = 200
+
+[[redirects]]
+  from = "/api/cos/push"
+  to = "/.netlify/functions/cos-push"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

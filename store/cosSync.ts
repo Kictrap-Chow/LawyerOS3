@@ -60,7 +60,7 @@ export const pullFromCos = async (config: CosConfig): Promise<{ cases: Case[]; p
   });
   const json = await readJsonSafely(res);
   if (res.status === 404) {
-    throw new Error('未找到 COS API。请用 `npm run build && npm run start:3001` 启动服务端模式。');
+    throw new Error('未找到 COS API。当前是纯静态模式，请改用服务端模式启动：npm run build && npm run start:3001');
   }
   if (!res.ok || !json?.ok) throw new Error(json?.error || `COS pull failed (HTTP ${res.status})`);
   return {
@@ -77,7 +77,7 @@ export const pushToCos = async (config: CosConfig, payload: { cases: Case[]; par
   });
   const json = await readJsonSafely(res);
   if (res.status === 404) {
-    throw new Error('未找到 COS API。请用 `npm run build && npm run start:3001` 启动服务端模式。');
+    throw new Error('未找到 COS API。当前是纯静态模式，请改用服务端模式启动：npm run build && npm run start:3001');
   }
   if (!res.ok || !json?.ok) throw new Error(json?.error || `COS push failed (HTTP ${res.status})`);
 };
