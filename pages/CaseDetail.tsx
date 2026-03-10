@@ -543,11 +543,11 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
            onCancel={() => setShowPartySelector(null)}
         />
     )}
-    <div className="grid grid-cols-1 gap-4 md:gap-8 animate-fade-in pb-20">
+    <div className="grid grid-cols-1 gap-3 md:gap-4 animate-fade-in pb-12">
       {showInfo && (
-      <div className="space-y-6 min-w-0">
+      <div className="space-y-4 min-w-0">
         {/* Client Info */}
-        <div className="craft-panel p-4 shadow-sm group">
+        <div className="craft-panel p-3 shadow-sm group">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-xs font-bold tint-text uppercase flex items-center gap-2"><MessageSquare size={14}/>{t('info.client')}</h3>
             <button onClick={() => addPartyToCase(true)} className="text-xs tint-text hover:underline">{t('info.addClient')}</button>
@@ -625,7 +625,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
         </div>
 
         {/* Opponent Info */}
-        <div className="craft-panel p-4 shadow-sm group">
+        <div className="craft-panel p-3 shadow-sm group">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-xs font-bold tint-text uppercase flex items-center gap-2"><Scale size={14}/>{t('info.opponent')}</h3>
             <button onClick={() => addPartyToCase(false)} className="text-xs tint-text hover:underline">{t('info.addOpponent')}</button>
@@ -682,10 +682,10 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
       )}
 
       {(showProcedure || (showInfo && showSpecialProject)) && (
-      <div className="space-y-6 min-w-0">
+      <div className="space-y-4 min-w-0">
          {/* Proceedings */}
          {showProcedure && (c.type === '诉讼' || c.type === '仲裁') && (
-           <div className="craft-panel p-4 shadow-sm">
+           <div className="craft-panel p-3 shadow-sm">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-bold tint-text uppercase">{t('proceedings.title')}</h3>
                 <button 
@@ -701,8 +701,8 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
               </div>
               
               {c.litigation.proceedings.map((proc, idx) => (
-                <div key={proc.id} className="mb-6 last:mb-0 pb-6 border-b border-gray-100 last:border-0 relative">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2 items-start">
+                <div key={proc.id} className="mb-4 last:mb-0 pb-4 border-b border-gray-100 last:border-0 relative bg-white/58 rounded-xl px-2.5 pt-2.5">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 mb-1.5 items-start">
                       <div className="min-w-0">
                         <label className="block text-[10px] tint-text mb-1">{t('proceedings.stage')}</label>
                         <input
@@ -724,7 +724,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                         />
                       </div>
                    </div>
-                   <div className="mb-3">
+                   <div className="mb-2">
                      <label className="block text-[10px] tint-text mb-1">{t('proceedings.caseNo')}</label>
                      <div className="flex items-center gap-2 w-full min-w-0">
                          <input
@@ -741,12 +741,12 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                    </div>
                    </div>
 
-                   <div className="space-y-3">
-                      <div className="grid grid-cols-1 gap-2">
+                   <div className="space-y-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
                         <div className="flex items-center gap-2 min-w-0">
                            <span className="text-xs text-gray-400 w-16 shrink-0">{t('proceedings.institution')}</span>
                            <input 
-                             className="flex-1 min-w-0 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[var(--ui-accent)] outline-none py-1"
+                             className="flex-1 min-w-0 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[var(--ui-accent)] outline-none py-0.5"
                              value={proc.courtName}
                              onChange={(e) => handleProcUpdate(proc.id, 'courtName', e.target.value)}
                              disabled={!editing}
@@ -756,7 +756,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                         <div className="flex items-center gap-2 min-w-0">
                            <span className="text-xs text-gray-400 w-16 shrink-0">{t('proceedings.address')}</span>
                            <input 
-                             className="flex-1 min-w-0 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[var(--ui-accent)] outline-none py-1"
+                             className="flex-1 min-w-0 text-xs border-b border-gray-100 hover:border-gray-300 focus:border-[var(--ui-accent)] outline-none py-0.5"
                              value={proc.courtAddress}
                              onChange={(e) => handleProcUpdate(proc.id, 'courtAddress', e.target.value)}
                              disabled={!editing}
@@ -766,7 +766,7 @@ const InfoTab = ({ c, editing, onDraftUpdate, onCommitUpdate, allParties, viewMo
                       </div>
                       
                       {/* Personnel List */}
-                      <div className="tint-bg rounded p-2 border tint-border">
+                      <div className="tint-bg rounded-lg p-2 border tint-border">
                          <div className="flex justify-between items-center mb-2">
                             <span className="text-[10px] font-bold tint-text uppercase">{t('proceedings.personnel')}</span>
                             <button onClick={() => handleAddPerson(proc.id)} className="text-[10px] tint-text hover:underline">+ Add Person</button>
@@ -1091,22 +1091,22 @@ export const CaseDetail: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col craft-surface min-w-0 overflow-x-hidden rounded-[30px]">
+    <div className="h-full flex flex-col craft-surface min-w-0 overflow-x-hidden rounded-[28px]">
       {/* Header */}
-      <div className="px-3 md:px-8 py-3 md:py-5 border-b border-[#e2e8f0] sticky top-0 bg-[#f8fbff]/88 backdrop-blur-xl z-10 flex flex-col gap-3 md:gap-4">
-        <div className="flex flex-col gap-3 md:gap-4">
+      <div className="px-3 md:px-6 py-2.5 md:py-3 border-b border-[#e2e8f0] sticky top-0 bg-[#f8fbff]/92 backdrop-blur-xl z-10 flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2 w-full min-w-0 xl:justify-end">
              {!isEditing ? (
-               <button onClick={() => { setIsEditing(true); setDraftCase(currentCase); }} className="h-10 px-4 border border-[#d9e1ed] bg-white rounded-[14px] text-sm whitespace-nowrap hover:bg-gray-50">{t('actions.edit')}</button>
+               <button onClick={() => { setIsEditing(true); setDraftCase(currentCase); }} className="h-9 px-3 border border-[#d9e1ed] bg-white rounded-[12px] text-sm whitespace-nowrap hover:bg-gray-50">{t('actions.edit')}</button>
              ) : (
-             <button onClick={() => { if (draftCase) updateCase(draftCase); setIsEditing(false); }} className="h-10 px-4 border accent-border rounded-[14px] text-sm whitespace-nowrap accent-bg accent-bg-hover text-white">{t('actions.saveChanges')}</button>
+             <button onClick={() => { if (draftCase) updateCase(draftCase); setIsEditing(false); }} className="h-9 px-3 border accent-border rounded-[12px] text-sm whitespace-nowrap accent-bg accent-bg-hover text-white">{t('actions.saveChanges')}</button>
              )}
              <button 
                onClick={() => setShowDeleteConfirm(true)}
-               className="h-10 px-4 border tint-border tint-text rounded-[14px] text-sm whitespace-nowrap hover:tint-bg"
+               className="h-9 px-3 border tint-border tint-text rounded-[12px] text-sm whitespace-nowrap hover:tint-bg"
              >{t('actions.deleteCase')}</button>
              <select 
-               className="h-10 px-4 border border-[#d9e1ed] bg-white rounded-[14px] text-sm min-w-[120px] max-w-full hover:bg-gray-50 outline-none cursor-pointer"
+               className="h-9 px-3 border border-[#d9e1ed] bg-white rounded-[12px] text-sm min-w-[112px] max-w-full hover:bg-gray-50 outline-none cursor-pointer"
                value={currentCase.status}
                onChange={handleStatusChange}
              >
@@ -1116,19 +1116,19 @@ export const CaseDetail: React.FC = () => {
              </select>
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-2 text-sm text-slate-500">
+            <div className="flex items-center gap-2 mb-1 text-xs md:text-sm text-slate-500">
                <span className="cursor-pointer hover:underline" onClick={() => navigate('dashboard')}>{t('breadcrumbs.dashboard')}</span> / <span>{t('breadcrumbs.cases')}</span>
             </div>
-            <div className="min-w-0 flex items-start gap-2 md:gap-3">
+            <div className="min-w-0 flex items-start gap-2">
               {isEditing && draftCase ? (
                 <input
-                  className="min-w-0 flex-1 text-[clamp(1.4rem,3.1vw,2.2rem)] leading-[1.15] font-bold text-[#1f2937] bg-transparent border-b border-[#d9e1ed] focus:border-[var(--ui-accent)] outline-none"
+                  className="min-w-0 flex-1 text-[clamp(1.24rem,2.4vw,1.86rem)] leading-[1.18] font-bold text-[#1f2937] bg-transparent border-b border-[#d9e1ed] focus:border-[var(--ui-accent)] outline-none"
                   value={draftCase.name}
                   onChange={(e) => setDraftCase({ ...draftCase, name: e.target.value })}
                   placeholder={t('case.create.name')}
                 />
               ) : (
-                <h1 className="min-w-0 flex-1 text-[clamp(1.4rem,3.1vw,2.2rem)] leading-[1.15] font-bold text-[#1f2937] whitespace-normal break-keep">
+                <h1 className="min-w-0 flex-1 text-[clamp(1.24rem,2.4vw,1.86rem)] leading-[1.18] font-bold text-[#1f2937] whitespace-normal break-keep">
                   {currentCase.name}
                 </h1>
               )}
@@ -1136,25 +1136,20 @@ export const CaseDetail: React.FC = () => {
                 <StatusBadge status={currentCase.status} />
               </span>
             </div>
-            <div className="text-xs md:text-sm text-slate-500 mt-1 flex gap-3 flex-wrap">
+            <div className="text-xs md:text-sm text-slate-500 mt-1 flex gap-2.5 flex-wrap items-center">
                <span>{currentCase.type}</span>
                {currentCase.updatedAt && <span>• Updated {new Date(currentCase.updatedAt).toLocaleString()}</span>}
+               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-[#e1e8f2]">待办 <b className="text-[#22344a]">{currentCase.tasks.filter((x) => !x.isCompleted).length}</b></span>
+               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-[#e1e8f2]">提醒 <b className="text-[#22344a]">{currentCase.reminders.length}</b></span>
+               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-[#e1e8f2]">期限 <b className="text-[#22344a]">{currentCase.deadlines.filter((x) => !x.completed).length}</b></span>
             </div>
-          </div>
-        </div>
-        <div className="w-full">
-          <div className="rounded-2xl bg-white/70 border border-white/90 px-3 py-2.5 flex flex-wrap gap-2 md:gap-3 text-xs md:text-sm text-[#5b6f86]">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-[#e1e8f2]">待办任务 <b className="text-[#22344a]">{currentCase.tasks.filter((x) => !x.isCompleted).length}</b></span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-[#e1e8f2]">日程提醒 <b className="text-[#22344a]">{currentCase.reminders.length}</b></span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-[#e1e8f2]">截止节点 <b className="text-[#22344a]">{currentCase.deadlines.filter((x) => !x.completed).length}</b></span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-[#e1e8f2]">工作日志 <b className="text-[#22344a]">{currentCase.logs.length}</b></span>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="w-full px-3 md:px-8 py-2.5 border-b border-[#e2e8f0]">
-        <div className="craft-panel rounded-[18px] px-2 py-1.5 flex gap-2 text-sm overflow-x-auto overflow-y-hidden scrollbar-hide snap-x snap-mandatory">
+      <div className="w-full px-3 md:px-6 py-2 border-b border-[#e2e8f0]">
+        <div className="craft-panel rounded-[16px] px-2 py-1 flex gap-1.5 text-sm overflow-x-auto overflow-y-hidden scrollbar-hide snap-x snap-mandatory">
           {['info', 'procedure', 'tasks', 'schedule', 'reminders', 'deadlines', 'logs', 'trash'].map(tab => (
             <div
               key={tab}
@@ -1168,8 +1163,8 @@ export const CaseDetail: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2.5 md:p-8 pb-24 md:pb-8 bg-gradient-to-b from-[#f6f9fd]/70 to-[#f1f6fc]/45">
-        <div className="w-full max-w-5xl mx-auto min-w-0">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 md:p-4 pb-20 md:pb-6 bg-gradient-to-b from-[#f6f9fd]/70 to-[#f1f6fc]/45">
+        <div className="w-full max-w-[1060px] mx-auto min-w-0">
           
           {activeTab === 'info' && draftCase && (
             <InfoTab 

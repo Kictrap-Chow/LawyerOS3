@@ -4,6 +4,13 @@ import bodyParser from 'body-parser';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -92,9 +99,67 @@ const buildIcs = (cases = []) => {
   return `${lines.join('\r\n')}\r\n`;
 };
 
+const normalizePrefix = (prefix = '') => String(prefix || '').replace(/^\/+|\/+$/g, '');
+
+const makeCosClient = (config) => {
+  const region = String(config?.region || '').trim();
+  const secretId = String(config?.secretId || '').trim();
+  const secretKey = String(config?.secretKey || '').trim();
+  if (!region || !secretId || !secretKey) {
+    throw new Error('COS config incomplete');
+  }
+  return new S3Client({
+    region,
+    endpoint: `https://cos.${region}.myqcloud.com`,
+    forcePathStyle: true,
+    credentials: {
+      accessKeyId: secretId,
+      secretAccessKey: secretKey,
+    },
+  });
+};
+
+const streamToString = async (stream) =>
+  await new Promise((resolve, reject) => {
+    const chunks = [];
+    stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+  });
+
+const readJsonObject = async (client, bucket, key) => {
+  try {
+    const obj = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    const text = await streamToString(obj.Body);
+    return JSON.parse(text || '{}');
+  } catch (error) {
+    const status = error?.$metadata?.httpStatusCode;
+    const code = error?.Code || error?.name;
+    if (status === 404 || code === 'NoSuchKey' || code === 'NotFound') return null;
+    throw error;
+  }
+};
+
+const putJsonObject = async (client, bucket, key, value) => {
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: JSON.stringify(value, null, 2),
+      ContentType: 'application/json',
+    })
+  );
+};
+
 // Middleware
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
+app.use((req, res, next) => {
+  if (req.path === '/sw.js' || req.path === '/index.html' || req.path === '/manifest.webmanifest') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Ensure data directory exists
@@ -145,6 +210,105 @@ app.get('/api/calendar.ics', (req, res) => {
   } catch (err) {
     console.error('Error building ics:', err);
     res.status(500).send('Failed to generate calendar feed');
+  }
+});
+
+app.post('/api/cos/pull', async (req, res) => {
+  try {
+    const config = req.body?.config || {};
+    const bucket = String(config.bucket || '').trim();
+    const prefix = normalizePrefix(config.prefix || 'LawyerOS3');
+    if (!bucket) return res.status(400).json({ ok: false, error: 'COS bucket is required' });
+    const client = makeCosClient(config);
+
+    const manifestKey = `${prefix}/manifest.json`;
+    const casesPrefix = `${prefix}/cases/`;
+    const partiesPrefix = `${prefix}/parties/`;
+
+    const manifest = (await readJsonObject(client, bucket, manifestKey)) || {};
+    const caseIds = Array.isArray(manifest.caseIds) ? manifest.caseIds : [];
+    const partyIds = Array.isArray(manifest.partyIds) ? manifest.partyIds : [];
+
+    const cases = [];
+    for (const id of caseIds) {
+      const row = await readJsonObject(client, bucket, `${casesPrefix}${id}.json`);
+      if (row) cases.push(row);
+    }
+
+    const parties = [];
+    for (const id of partyIds) {
+      const row = await readJsonObject(client, bucket, `${partiesPrefix}${id}.json`);
+      if (row) parties.push(row);
+    }
+
+    return res.json({ ok: true, data: { cases, parties, manifest } });
+  } catch (error) {
+    console.error('COS pull failed:', error);
+    return res.status(500).json({ ok: false, error: error?.message || 'COS pull failed' });
+  }
+});
+
+app.post('/api/cos/push', async (req, res) => {
+  try {
+    const config = req.body?.config || {};
+    const data = req.body?.data || {};
+    const bucket = String(config.bucket || '').trim();
+    const prefix = normalizePrefix(config.prefix || 'LawyerOS3');
+    if (!bucket) return res.status(400).json({ ok: false, error: 'COS bucket is required' });
+
+    const client = makeCosClient(config);
+    const cases = Array.isArray(data.cases) ? data.cases : [];
+    const parties = Array.isArray(data.parties) ? data.parties : [];
+
+    const casesPrefix = `${prefix}/cases/`;
+    const partiesPrefix = `${prefix}/parties/`;
+    const caseIds = cases.map((item) => item.id).filter(Boolean);
+    const partyIds = parties.map((item) => item.id).filter(Boolean);
+
+    for (const item of cases) {
+      if (!item?.id) continue;
+      await putJsonObject(client, bucket, `${casesPrefix}${item.id}.json`, item);
+    }
+    for (const item of parties) {
+      if (!item?.id) continue;
+      await putJsonObject(client, bucket, `${partiesPrefix}${item.id}.json`, item);
+    }
+
+    const listAndDeleteStale = async (objPrefix, keepSet) => {
+      const listed = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: objPrefix }));
+      const staleKeys = (listed.Contents || [])
+        .map((obj) => obj.Key)
+        .filter((key) => key && key.endsWith('.json'))
+        .filter((key) => {
+          const id = key.replace(objPrefix, '').replace(/\.json$/, '');
+          return !keepSet.has(id);
+        });
+      if (!staleKeys.length) return;
+      await client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: staleKeys.map((Key) => ({ Key })) },
+        })
+      );
+    };
+
+    await listAndDeleteStale(casesPrefix, new Set(caseIds));
+    await listAndDeleteStale(partiesPrefix, new Set(partyIds));
+
+    const manifest = {
+      version: 2,
+      mode: 'segmented',
+      updatedAt: new Date().toISOString(),
+      caseCount: caseIds.length,
+      partyCount: partyIds.length,
+      caseIds,
+      partyIds,
+    };
+    await putJsonObject(client, bucket, `${prefix}/manifest.json`, manifest);
+    return res.json({ ok: true, data: { manifest } });
+  } catch (error) {
+    console.error('COS push failed:', error);
+    return res.status(500).json({ ok: false, error: error?.message || 'COS push failed' });
   }
 });
 

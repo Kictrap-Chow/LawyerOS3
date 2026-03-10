@@ -10,16 +10,44 @@ export const PartyManager: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingParty, setEditingParty] = useState<Party | null>(null);
   const [selectedPartyId, setSelectedPartyId] = useState<string | null>(null);
+  const [relationFilter, setRelationFilter] = useState<'all' | 'client' | 'opponent' | 'both' | 'none'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'dormant' | 'archived'>('all');
   const [caseKeyword, setCaseKeyword] = useState('');
   const [detailTab, setDetailTab] = useState<'cases' | 'tasks' | 'reminders' | 'schedule' | 'deadlines' | 'logs' | 'timeline'>('cases');
+
+  const partyMatches = (p: Party, target: Party) => {
+    if (p.id && target.id && p.id === target.id) return true;
+    if (p.name && target.name && p.name === target.name) {
+      if (p.idCode && target.idCode) return p.idCode === target.idCode;
+      return true;
+    }
+    return false;
+  };
+
+  const partyRelationById = useMemo(() => {
+    const map = new Map<string, 'client' | 'opponent' | 'both' | 'none'>();
+    parties.forEach((p) => {
+      let hasClient = false;
+      let hasOpponent = false;
+      cases.forEach((c) => {
+        if ((c.clients || []).some((x) => partyMatches(x, p))) hasClient = true;
+        if ((c.opponents || []).some((x) => partyMatches(x, p))) hasOpponent = true;
+      });
+      if (hasClient && hasOpponent) map.set(p.id, 'both');
+      else if (hasClient) map.set(p.id, 'client');
+      else if (hasOpponent) map.set(p.id, 'opponent');
+      else map.set(p.id, 'none');
+    });
+    return map;
+  }, [cases, parties]);
 
   const filteredParties = useMemo(
     () =>
       parties
         .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()) || p.idCode.includes(search))
+        .filter((p) => relationFilter === 'all' ? true : (partyRelationById.get(p.id) || 'none') === relationFilter)
         .sort((a, b) => a.name.localeCompare(b.name)),
-    [parties, search]
+    [parties, search, relationFilter, partyRelationById]
   );
 
   useEffect(() => {
@@ -36,15 +64,6 @@ export const PartyManager: React.FC = () => {
     () => (selectedPartyId ? parties.find((p) => p.id === selectedPartyId) || null : null),
     [parties, selectedPartyId]
   );
-
-  const partyMatches = (p: Party, target: Party) => {
-    if (p.id && target.id && p.id === target.id) return true;
-    if (p.name && target.name && p.name === target.name) {
-      if (p.idCode && target.idCode) return p.idCode === target.idCode;
-      return true;
-    }
-    return false;
-  };
 
   const linkedCases = useMemo(() => {
     if (!selectedParty) return [];
@@ -286,6 +305,24 @@ export const PartyManager: React.FC = () => {
         />
       </div>
 
+      <div className="mb-3 flex flex-wrap gap-2">
+        {[
+          { key: 'all', label: '全部' },
+          { key: 'client', label: '仅客户' },
+          { key: 'opponent', label: '仅对方' },
+          { key: 'both', label: '双方' },
+          { key: 'none', label: '未关联' }
+        ].map((item) => (
+          <button
+            key={item.key}
+            onClick={() => setRelationFilter(item.key as any)}
+            className={`px-2.5 py-1 text-xs rounded-full border ${relationFilter === item.key ? 'bg-[#1f293b] text-white border-[#1f293b]' : 'bg-white text-[var(--ui-text-strong)] border-[#d8e3f0]'}`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 xl:grid-cols-[340px_1fr] gap-3 flex-1 min-h-0">
         <div className="craft-surface min-h-[360px] max-h-full overflow-hidden flex flex-col">
           <div className="px-4 py-2.5 border-b border-[#e3ebf5] text-xs font-semibold text-[var(--ui-muted)]">客户列表</div>
@@ -299,6 +336,14 @@ export const PartyManager: React.FC = () => {
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-medium text-slate-800 truncate">{p.name}</div>
                   <div className="text-sm">{p.type === 'company' ? '🏢' : '👤'}</div>
+                </div>
+                <div className="mt-1 text-[11px]">
+                  <span className="px-1.5 py-0.5 rounded-full border border-[#d8e3f0] bg-white text-[#55657a]">
+                    {partyRelationById.get(p.id) === 'client' && '客户'}
+                    {partyRelationById.get(p.id) === 'opponent' && '对方'}
+                    {partyRelationById.get(p.id) === 'both' && '双方'}
+                    {partyRelationById.get(p.id) === 'none' && '未关联'}
+                  </span>
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1 truncate">{p.idCode || '无证件号'}</div>
                 <div className="mt-2 flex justify-end gap-2">

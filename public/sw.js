@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lawyeros-shell-v20260309';
+const CACHE_NAME = 'lawyeros-shell-v20260310-zipfix';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -34,6 +34,23 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  const pathname = reqUrl.pathname || '';
+  const isStaticAsset = pathname.startsWith('/assets/') || pathname.endsWith('.js') || pathname.endsWith('.css');
+  if (isStaticAsset) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200 && response.type === 'basic') {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
     );
     return;
   }

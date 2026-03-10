@@ -1,17 +1,18 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../store/I18nContext';
 import { ThemePreset, useTheme } from '../store/ThemeContext';
 import { cn } from '../utils';
 import { useData } from '../store/DataContext';
-import { FileJson, FileUp } from 'lucide-react';
+import { FileArchive, FileJson, FileUp, FolderOpen } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const { lang, setLang } = useI18n();
   const { preset, setPreset, accent, setAccent, textColor, setTextColor, font, setFont } = useTheme();
   const {
     isSupabaseEnabled, authLoading, isAuthenticated, userEmail, syncMode, setSyncMode, signIn, signUp, signOut,
+    cosConfig, setCosConfig, isCosConfigured,
     forceUploadToSupabaseNow, forceDownloadFromSupabaseNow,
-    exportData, importData,
+    exportData, importData, exportSegmentedToZip, importSegmentedFromZip, exportSegmentedToFolder, importSegmentedFromFolder, importSegmentedFromDirectoryFiles,
     localFileSyncSupported, localFileSyncEnabled, localFileSyncKind, localFileSyncFileName, localFileSyncMessage,
     setupLocalFileSyncByFolder, setupLocalFileSyncByExport, bindLocalFileSyncExisting, pullFromLocalFileSync, flushLocalFileSyncNow, disableLocalFileSync
   } = useData();
@@ -21,9 +22,15 @@ export const Settings: React.FC = () => {
   const [authBusy, setAuthBusy] = useState(false);
   const [onlineSyncActionMessage, setOnlineSyncActionMessage] = useState('');
   const [localSyncActionMessage, setLocalSyncActionMessage] = useState('');
+  const [dataActionMessage, setDataActionMessage] = useState('');
+  const [dataBusy, setDataBusy] = useState(false);
+  const [dragOverFolderZone, setDragOverFolderZone] = useState(false);
   const [localSyncBusy, setLocalSyncBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
   const [calendarToken, setCalendarToken] = useState(() => localStorage.getItem('calendarFeedToken') || '');
+  const [cosDraft, setCosDraft] = useState(cosConfig);
 
   const calendarFeedUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -62,6 +69,18 @@ export const Settings: React.FC = () => {
     setAuthMessage('已退出登录。');
   };
 
+  useEffect(() => {
+    setCosDraft(cosConfig);
+  }, [cosConfig]);
+
+  const handleSaveCosConfig = () => {
+    setCosConfig({
+      ...cosDraft,
+      prefix: (cosDraft.prefix || 'LawyerOS3').trim(),
+    });
+    setOnlineSyncActionMessage('COS 配置已保存。');
+  };
+
   const handleForceUploadNow = async () => {
     setAuthBusy(true);
     const res = await forceUploadToSupabaseNow();
@@ -82,12 +101,102 @@ export const Settings: React.FC = () => {
     try {
       const text = await file.text();
       importData(text);
-      alert('数据导入成功');
+      setDataActionMessage('单文件导入成功。');
     } catch {
-      alert('读取文件失败，请重试');
+      setDataActionMessage('读取文件失败，请重试。');
     } finally {
       e.target.value = '';
     }
+  };
+
+  const handleExportFolder = async () => {
+    setDataBusy(true);
+    const res = await exportSegmentedToFolder();
+    setDataBusy(false);
+    setDataActionMessage(res.message);
+  };
+
+  const handleExportZip = async () => {
+    setDataBusy(true);
+    const res = await exportSegmentedToZip();
+    setDataBusy(false);
+    setDataActionMessage(res.message);
+  };
+
+  const handleImportZip = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setDataBusy(true);
+    const res = await importSegmentedFromZip(file);
+    setDataBusy(false);
+    setDataActionMessage(res.message);
+    e.target.value = '';
+  };
+
+  const handleImportFolder = async () => {
+    setDataBusy(true);
+    const res = await importSegmentedFromFolder();
+    setDataBusy(false);
+    setDataActionMessage(res.message);
+  };
+
+  const handleImportFolderFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDataBusy(true);
+    const res = await importSegmentedFromDirectoryFiles(e.target.files);
+    setDataBusy(false);
+    setDataActionMessage(res.message);
+    e.target.value = '';
+  };
+
+  const collectFilesFromEntry = useCallback(async (entry: any): Promise<File[]> => {
+    if (!entry) return [];
+    if (entry.isFile) {
+      return await new Promise<File[]>((resolve) => {
+        entry.file((file: File) => resolve([file]), () => resolve([]));
+      });
+    }
+    if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const chunks: any[] = [];
+      // readEntries may return partial batches; keep reading until empty.
+      while (true) {
+        // eslint-disable-next-line no-await-in-loop
+        const batch = await new Promise<any[]>((resolve) => reader.readEntries(resolve, () => resolve([])));
+        if (!batch.length) break;
+        chunks.push(...batch);
+      }
+      const nested = await Promise.all(chunks.map((child) => collectFilesFromEntry(child)));
+      return nested.flat();
+    }
+    return [];
+  }, []);
+
+  const handleFolderDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOverFolderZone(false);
+    if (dataBusy) return;
+    const dt = e.dataTransfer;
+    const items = Array.from(dt.items || []);
+    const entries = items
+      .map((item: any) => (typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null))
+      .filter(Boolean);
+
+    let files: File[] = [];
+    if (entries.length) {
+      const nested = await Promise.all(entries.map((entry) => collectFilesFromEntry(entry)));
+      files = nested.flat();
+    } else {
+      files = Array.from(dt.files || []);
+    }
+
+    setDataBusy(true);
+    const res = await importSegmentedFromDirectoryFiles(files);
+    setDataBusy(false);
+    setDataActionMessage(res.message);
+  }, [collectFilesFromEntry, dataBusy, importSegmentedFromDirectoryFiles]);
+
+  const handleExportSingle = () => {
+    exportData();
+    setDataActionMessage('已导出单文件备份。');
   };
 
   const handleSetupLocalSync = async () => {
@@ -179,7 +288,7 @@ export const Settings: React.FC = () => {
             )}
             onClick={() => setSyncMode('online')}
           >
-            联网（Supabase）
+            联网（COS）
           </button>
         </div>
         {syncMode === 'local' && (
@@ -249,74 +358,70 @@ export const Settings: React.FC = () => {
             </div>
           </div>
         )}
-        {syncMode === 'online' && !isSupabaseEnabled && (
-          <div className="text-sm text-gray-500">当前未配置云端同步环境变量，在线同步不可用。</div>
-        )}
-        {syncMode === 'online' && isSupabaseEnabled && (
-          <div className="text-xs text-[#6a7d93] mb-2">
-            联网模式使用 Supabase 分模块同步：`manifest + cases + parties`（Storage 文件结构）。
-          </div>
-        )}
-        {syncMode === 'online' && isSupabaseEnabled && authLoading && (
-          <div className="text-sm text-gray-500">正在检查登录状态...</div>
-        )}
-        {syncMode === 'online' && isSupabaseEnabled && !authLoading && !isAuthenticated && (
+        {syncMode === 'online' && (
           <div className="space-y-2">
-            <form
-              className="space-y-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void handleSignIn();
-              }}
-            >
+            <div className="text-xs text-[#6a7d93]">
+              联网模式使用腾讯云 COS 分模块同步：`manifest + cases + parties`。
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <input
-                type="email"
-                name="email"
-                autoComplete="email"
-                placeholder="邮箱"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={cosDraft.secretId}
+                onChange={(e) => setCosDraft((prev) => ({ ...prev, secretId: e.target.value }))}
+                placeholder="SecretId"
                 className="w-full text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
               />
               <input
-                type="password"
-                name="password"
-                autoComplete="current-password"
-                placeholder="密码"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={cosDraft.secretKey}
+                onChange={(e) => setCosDraft((prev) => ({ ...prev, secretKey: e.target.value }))}
+                placeholder="SecretKey"
                 className="w-full text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
               />
-              <div className="flex gap-2">
-                <button type="submit" disabled={authBusy} className="accent-bg accent-bg-hover text-white px-3 py-1.5 rounded text-sm disabled:opacity-60">登录</button>
-                <button type="button" disabled={authBusy} onClick={handleSignUp} className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60">注册</button>
-              </div>
-            </form>
-            {authMessage && <div className="text-xs text-gray-500">{authMessage}</div>}
-          </div>
-        )}
-        {syncMode === 'online' && isSupabaseEnabled && !authLoading && isAuthenticated && (
-          <div className="space-y-2">
-            <div className="text-sm text-gray-600">当前登录：<span className="font-medium text-strong-theme">{userEmail}</span></div>
+              <input
+                value={cosDraft.region}
+                onChange={(e) => setCosDraft((prev) => ({ ...prev, region: e.target.value }))}
+                placeholder="Region（例如 ap-guangzhou）"
+                className="w-full text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
+              />
+              <input
+                value={cosDraft.bucket}
+                onChange={(e) => setCosDraft((prev) => ({ ...prev, bucket: e.target.value }))}
+                placeholder="Bucket（例如 mybucket-1250000000）"
+                className="w-full text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
+              />
+              <input
+                value={cosDraft.prefix}
+                onChange={(e) => setCosDraft((prev) => ({ ...prev, prefix: e.target.value }))}
+                placeholder="Prefix（默认 LawyerOS3）"
+                className="w-full md:col-span-2 text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
+              />
+            </div>
             <div className="flex flex-wrap gap-2">
               <button
                 disabled={authBusy}
+                onClick={handleSaveCosConfig}
+                className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60"
+              >
+                保存 COS 配置
+              </button>
+              <button
+                disabled={authBusy || !isCosConfigured}
                 onClick={handleForceUploadNow}
                 className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60"
               >
                 立即上传（覆盖云端）
               </button>
               <button
-                disabled={authBusy}
+                disabled={authBusy || !isCosConfigured}
                 onClick={handleForceDownloadNow}
                 className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60"
               >
                 立即下载（覆盖本地）
               </button>
-              <button disabled={authBusy} onClick={handleSignOut} className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60">退出登录</button>
+            </div>
+            <div className="text-xs text-[#6a7d93]">
+              状态：{isCosConfigured ? `已配置（${cosConfig.bucket}@${cosConfig.region}）` : '未配置'}
             </div>
             {onlineSyncActionMessage && <div className="text-xs text-[#6a7d93]">{onlineSyncActionMessage}</div>}
-            {authMessage && <div className="text-xs text-gray-500">{authMessage}</div>}
           </div>
         )}
       </div>
@@ -396,13 +501,101 @@ export const Settings: React.FC = () => {
 
       <div className="craft-panel p-4 md:p-5 mb-4">
         <h2 className="text-sm font-semibold tint-text uppercase mb-3">数据管理</h2>
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div
+          className={cn(
+            "mb-3 rounded-2xl border-2 border-dashed px-4 py-4 text-xs transition-colors",
+            dragOverFolderZone ? 'border-[var(--ui-accent)] bg-white shadow-[0_8px_20px_rgba(24,58,97,0.08)]' : 'border-[#d8e3f0] bg-white/75'
+          )}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOverFolderZone(true);
+          }}
+          onDragLeave={() => setDragOverFolderZone(false)}
+          onDrop={handleFolderDrop}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-[var(--ui-accent-soft)] text-[var(--ui-accent)] flex items-center justify-center">
+              <FolderOpen size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-strong-theme">拖拽分模块备份文件夹到这里</div>
+              <div className="text-xs text-[#6b7a8d] mt-1">需包含 `cases` / `parties` / `manifest.json`</div>
+            </div>
+            <button
+              type="button"
+              onClick={handleImportFolder}
+              disabled={dataBusy}
+              className="px-3 py-2 text-xs rounded-lg border tint-border bg-white hover:bg-[#f7f9fc] disabled:opacity-60"
+            >
+              选择文件夹导入
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button
-            onClick={exportData}
+            onClick={handleExportZip}
+            disabled={dataBusy}
+            className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+          >
+            <FileArchive size={14} />
+            导出 ZIP 备份包
+          </button>
+          <button
+            onClick={() => zipInputRef.current?.click()}
+            disabled={dataBusy}
+            className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+          >
+            <FileArchive size={14} />
+            导入 ZIP 备份包
+          </button>
+          <input
+            ref={zipInputRef}
+            type="file"
+            accept=".zip,application/zip,application/x-zip-compressed"
+            className="hidden"
+            onChange={handleImportZip}
+          />
+          <button
+            onClick={handleExportFolder}
+            disabled={dataBusy}
+            className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+          >
+            <FileJson size={14} />
+            导出分模块文件夹
+          </button>
+          <button
+            onClick={handleImportFolder}
+            disabled={dataBusy}
+            className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+          >
+            <FileUp size={14} />
+            导入分模块文件夹
+          </button>
+          <input
+            ref={folderInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={handleImportFolderFiles}
+            // @ts-ignore webkitdirectory is non-standard but widely supported.
+            webkitdirectory=""
+            // @ts-ignore directory is a legacy alias used by some browsers.
+            directory=""
+          />
+          <button
+            onClick={() => folderInputRef.current?.click()}
+            disabled={dataBusy}
+            className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text disabled:opacity-60"
+          >
+            <FolderOpen size={14} />
+            兼容导入（选文件）
+          </button>
+          <button
+            onClick={handleExportSingle}
             className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text"
           >
             <FileJson size={14} />
-            备份数据（分模块）
+            导出单文件（兼容）
           </button>
           <input
             ref={fileInputRef}
@@ -416,9 +609,10 @@ export const Settings: React.FC = () => {
             className="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded border tint-border hover:bg-white tint-text"
           >
             <FileUp size={14} />
-            导入数据
+            导入单文件（兼容）
           </button>
         </div>
+        {dataActionMessage && <div className="mt-2 text-xs text-[#6a7d93]">{dataActionMessage}</div>}
       </div>
 
       <div className="craft-panel p-4 md:p-5 mb-4">

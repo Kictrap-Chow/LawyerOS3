@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Case, Party } from '../types';
 import { nowISO } from '../utils';
+import JSZip from 'jszip';
 import { isSupabaseConfigured, supabase, supabaseSyncBucket } from './supabase';
 import { User } from '@supabase/supabase-js';
 import {
@@ -25,6 +26,15 @@ import {
   pushSupabaseSegmented,
   readSupabaseSegmentedManifestMeta,
 } from './supabaseSegmentedSync';
+import {
+  emptyCosConfig,
+  isCosConfigReady,
+  loadCosConfig,
+  pullFromCos,
+  pushToCos,
+  saveCosConfig,
+  type CosConfig,
+} from './cosSync';
 
 interface DataContextType {
   cases: Case[];
@@ -39,6 +49,11 @@ interface DataContextType {
   deleteParty: (id: string) => void;
   importData: (json: string) => void;
   exportData: () => void;
+  exportSegmentedToZip: () => Promise<{ ok: boolean; message: string }>;
+  importSegmentedFromZip: (file: File | null) => Promise<{ ok: boolean; message: string }>;
+  exportSegmentedToFolder: () => Promise<{ ok: boolean; message: string }>;
+  importSegmentedFromFolder: () => Promise<{ ok: boolean; message: string }>;
+  importSegmentedFromDirectoryFiles: (files: FileList | File[] | null) => Promise<{ ok: boolean; message: string }>;
   syncStatus: 'offline' | 'syncing' | 'online' | 'error';
   syncError: string | null;
   lastSyncedAt: string | null;
@@ -51,6 +66,9 @@ interface DataContextType {
   signIn: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   signUp: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   signOut: () => Promise<void>;
+  cosConfig: CosConfig;
+  setCosConfig: (next: CosConfig) => void;
+  isCosConfigured: boolean;
   forceUploadToSupabaseNow: () => Promise<{ ok: boolean; message: string }>;
   forceDownloadFromSupabaseNow: () => Promise<{ ok: boolean; message: string }>;
   localFileSyncSupported: boolean;
@@ -147,6 +165,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isBootstrapped, setIsBootstrapped] = useState(false);
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [authUser, setAuthUser] = useState<User | null>(null);
+  const [cosConfig, setCosConfigState] = useState<CosConfig>(() => loadCosConfig());
   const [syncMode, setSyncModeState] = useState<'local' | 'online'>(() => {
     const saved = localStorage.getItem(APP_KEY_SYNC_MODE);
     if (saved === 'local' || saved === 'online') return saved;
@@ -156,6 +175,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [localFileSyncFileName, setLocalFileSyncFileName] = useState<string | null>(null);
   const [localFileSyncMessage, setLocalFileSyncMessage] = useState<string | null>(null);
   const [localFileSyncKind, setLocalFileSyncKind] = useState<'file' | 'directory' | null>(null);
+  const isCosConfigured = isCosConfigReady(cosConfig);
 
   const skipNextSyncRef = useRef(false);
   const skipNextLocalSyncPushRef = useRef(false);
@@ -179,6 +199,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (mode === 'local') {
       setSyncError(null);
     }
+  };
+
+  const setCosConfig = (next: CosConfig) => {
+    setCosConfigState(next);
+    saveCosConfig(next);
+    mutationDuringBootstrapRef.current = false;
+    setIsBootstrapped(false);
   };
 
   useEffect(() => {
@@ -380,12 +407,39 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [syncMode]);
 
+  const pullFromCosCloud = useCallback(async () => {
+    if (!isCosConfigReady(cosConfig)) {
+      throw new Error('请先在设置中完整填写 COS 配置。');
+    }
+    const payload = await pullFromCos(cosConfig);
+    return {
+      cases: payload.cases.map(normalizeCase),
+      parties: payload.parties,
+    };
+  }, [cosConfig]);
+
+  const pushToCosCloud = useCallback(async (nextCases: Case[], nextParties: Party[]) => {
+    if (!isCosConfigReady(cosConfig)) {
+      throw new Error('请先在设置中完整填写 COS 配置。');
+    }
+    await pushToCos(cosConfig, { cases: nextCases, parties: nextParties });
+  }, [cosConfig]);
+
   const pullSupabaseLegacyTables = useCallback(async (ownerId: string) => {
     if (!supabase) return { cases: [] as Case[], parties: [] as Party[] };
-    const [casesRes, partiesRes] = await Promise.all([
-      supabase.from('cases').select('id,data').eq('owner_id', ownerId).order('updated_at', { ascending: false }),
-      supabase.from('parties').select('id,data').eq('owner_id', ownerId).order('updated_at', { ascending: false }),
-    ]);
+    let casesRes: any;
+    let partiesRes: any;
+    try {
+      [casesRes, partiesRes] = await Promise.all([
+        supabase.from('cases').select('id,data').eq('owner_id', ownerId).order('updated_at', { ascending: false }),
+        supabase.from('parties').select('id,data').eq('owner_id', ownerId).order('updated_at', { ascending: false }),
+      ]);
+    } catch {
+      [casesRes, partiesRes] = await Promise.all([
+        supabase.from('cases').select('id,data').eq('owner_id', ownerId),
+        supabase.from('parties').select('id,data').eq('owner_id', ownerId),
+      ]);
+    }
     if (casesRes.error) throw casesRes.error;
     if (partiesRes.error) throw partiesRes.error;
     const nextCases = (casesRes.data || []).map((row: any) => normalizeCase({ ...(row.data || {}), id: row.id }));
@@ -401,14 +455,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ]);
     if (caseCountRes.error) throw caseCountRes.error;
     if (partyCountRes.error) throw partyCountRes.error;
-    const [remoteCaseLatestRes, remotePartyLatestRes] = await Promise.all([
-      supabase.from('cases').select('updated_at').eq('owner_id', ownerId).order('updated_at', { ascending: false }).limit(1),
-      supabase.from('parties').select('updated_at').eq('owner_id', ownerId).order('updated_at', { ascending: false }).limit(1),
-    ]);
-    if (remoteCaseLatestRes.error) throw remoteCaseLatestRes.error;
-    if (remotePartyLatestRes.error) throw remotePartyLatestRes.error;
-    const remoteCaseTs = remoteCaseLatestRes.data?.[0]?.updated_at ? new Date(remoteCaseLatestRes.data[0].updated_at).getTime() : 0;
-    const remotePartyTs = remotePartyLatestRes.data?.[0]?.updated_at ? new Date(remotePartyLatestRes.data[0].updated_at).getTime() : 0;
+    let remoteCaseTs = 0;
+    let remotePartyTs = 0;
+    try {
+      const [remoteCaseLatestRes, remotePartyLatestRes] = await Promise.all([
+        supabase.from('cases').select('updated_at').eq('owner_id', ownerId).order('updated_at', { ascending: false }).limit(1),
+        supabase.from('parties').select('updated_at').eq('owner_id', ownerId).order('updated_at', { ascending: false }).limit(1),
+      ]);
+      if (remoteCaseLatestRes.error) throw remoteCaseLatestRes.error;
+      if (remotePartyLatestRes.error) throw remotePartyLatestRes.error;
+      remoteCaseTs = remoteCaseLatestRes.data?.[0]?.updated_at ? new Date(remoteCaseLatestRes.data[0].updated_at).getTime() : 0;
+      remotePartyTs = remotePartyLatestRes.data?.[0]?.updated_at ? new Date(remotePartyLatestRes.data[0].updated_at).getTime() : 0;
+    } catch {
+      remoteCaseTs = 0;
+      remotePartyTs = 0;
+    }
     return {
       count: (caseCountRes.count || 0) + (partyCountRes.count || 0),
       latestTs: Math.max(remoteCaseTs || 0, remotePartyTs || 0),
@@ -511,33 +572,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [loadFromLocal, pullSupabaseData]);
 
   useEffect(() => {
-    if (syncMode !== 'online') {
-      setAuthLoading(false);
-      setAuthUser(null);
-      return;
-    }
-    if (!isSupabaseConfigured || !supabase) {
-      setAuthLoading(false);
-      return;
-    }
-
-    let mounted = true;
-    const init = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!mounted) return;
-      setAuthUser(data.session?.user ?? null);
-      setAuthLoading(false);
-    };
-    void init();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthUser(session?.user ?? null);
-    });
-
-    return () => {
-      mounted = false;
-      authListener.subscription.unsubscribe();
-    };
+    setAuthLoading(false);
+    setAuthUser(null);
   }, [syncMode]);
 
   useEffect(() => {
@@ -584,26 +620,41 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      if (isSupabaseConfigured && supabase && syncMode === 'online') {
-        if (authLoading) return;
-        if (!authUser?.id) {
+      if (syncMode === 'online') {
+        if (!isCosConfigReady(cosConfig)) {
+          loadFromLocal();
+          setSyncStatus('offline');
+          setSyncError('请先在设置页填写 COS 配置后再同步。');
+          setIsBootstrapped(true);
+          return;
+        }
+        try {
+          const payload = await pullFromCosCloud();
+          const remoteEmpty = payload.cases.length === 0 && payload.parties.length === 0;
+          const localCaseCount = parseLocalList<Case>(APP_KEY_CASES).length;
+          const localPartyCount = parseLocalList<Party>(APP_KEY_PARTIES).length;
+          const localHasData = localCaseCount > 0 || localPartyCount > 0;
+          if (remoteEmpty && localHasData) {
+            loadFromLocal();
+            setSyncStatus('online');
+            setSyncError('检测到 COS 云端为空，已保留本地数据。可点“立即上传”初始化云端分模块文件。');
+            setIsBootstrapped(true);
+            return;
+          }
           if (shouldAbortBootstrapApply()) {
             setIsBootstrapped(true);
             return;
           }
-          // Keep local data visible when signed out; only disable cloud sync.
+          applyDataset(payload.cases, payload.parties, true);
+          setSyncStatus('online');
+          setSyncError(null);
+          setLastSyncedAt(nowISO());
+          setIsBootstrapped(true);
+          return;
+        } catch (error: any) {
           loadFromLocal();
-          setSyncStatus('offline');
-          setSyncError('请先在设置页登录后再同步');
-          setIsBootstrapped(true);
-          return;
-        }
-        const loaded = await loadFromSupabase(authUser.id);
-        if (shouldAbortBootstrapApply()) {
-          setIsBootstrapped(true);
-          return;
-        }
-        if (loaded) {
+          setSyncStatus('error');
+          setSyncError(readableError(error, 'COS 拉取失败'));
           setIsBootstrapped(true);
           return;
         }
@@ -622,7 +673,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     void bootstrap();
-  }, [authLoading, authUser?.id, isBootstrapped, loadFromLocal, loadFromServerFile, loadFromSupabase, localFileSyncEnabled, localFileSyncSupported, pullFromBoundLocalFile, syncMode]);
+  }, [cosConfig, isBootstrapped, loadFromLocal, loadFromServerFile, localFileSyncEnabled, localFileSyncSupported, pullFromBoundLocalFile, pullFromCosCloud, syncMode]);
 
   const saveToServerFile = useCallback(async (nextCases: Case[], nextParties: Party[]) => {
     try {
@@ -637,6 +688,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const syncToSupabase = useCallback(async (nextCases: Case[], nextParties: Party[], ownerId: string | null) => {
+    if (syncMode === 'online') {
+      try {
+        setSyncStatus('syncing');
+        await pushToCosCloud(nextCases, nextParties);
+        setSyncStatus('online');
+        setSyncError(null);
+        setLastSyncedAt(nowISO());
+      } catch (error: any) {
+        setSyncStatus('error');
+        setSyncError(readableError(error, 'COS 同步失败'));
+      }
+      return;
+    }
     if (!supabase || !isSupabaseConfigured) {
       await saveToServerFile(nextCases, nextParties);
       return;
@@ -706,9 +770,48 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSyncStatus('error');
       setSyncError(readableError(error, 'Supabase sync failed'));
     }
-  }, [getSupabaseLegacyRemoteMeta, pushSupabaseLegacyTables, saveToServerFile]);
+  }, [getSupabaseLegacyRemoteMeta, pushSupabaseLegacyTables, pushToCosCloud, saveToServerFile, syncMode]);
 
   const forceUploadToSupabaseNow = useCallback(async () => {
+    if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
+    try {
+      setSyncStatus('syncing');
+      await pushToCosCloud(cases, parties);
+      setSyncStatus('online');
+      setSyncError(null);
+      setLastSyncedAt(nowISO());
+      return { ok: true, message: '已立即上传到 COS（本地覆盖云端）。' };
+    } catch (error: any) {
+      const message = readableError(error, 'COS 强制上传失败');
+      setSyncStatus('error');
+      setSyncError(message);
+      return { ok: false, message };
+    }
+  }, [cases, parties, pushToCosCloud, syncMode]);
+
+  const forceDownloadFromSupabaseNow = useCallback(async () => {
+    if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
+    try {
+      setSyncStatus('syncing');
+      const payload = await pullFromCosCloud();
+      applyDataset(payload.cases, payload.parties, true);
+      setSyncStatus('online');
+      setSyncError(null);
+      setLastSyncedAt(nowISO());
+      return { ok: true, message: '已立即从 COS 下载（云端覆盖本地）。' };
+    } catch (error: any) {
+      const message = readableError(error, 'COS 强制下载失败');
+      setSyncStatus('error');
+      setSyncError(message);
+      return { ok: false, message };
+    }
+  }, [pullFromCosCloud, syncMode]);
+
+  /*
+   * Legacy Supabase fallback path (kept for historical compatibility).
+   * Current online mode now prefers COS and returns above.
+   */
+  const legacyForceUploadToSupabaseNow = useCallback(async () => {
     if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
     if (!supabase || !isSupabaseConfigured) return { ok: false, message: '云端同步未配置。' };
     if (!authUser?.id) return { ok: false, message: '请先登录 Supabase。' };
@@ -732,7 +835,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [authUser?.id, cases, parties, pushSupabaseLegacyTables, syncMode]);
 
-  const forceDownloadFromSupabaseNow = useCallback(async () => {
+  const legacyForceDownloadFromSupabaseNow = useCallback(async () => {
     if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
     if (!supabase || !isSupabaseConfigured) return { ok: false, message: '云端同步未配置。' };
     if (!authUser?.id) return { ok: false, message: '请先登录 Supabase。' };
@@ -883,28 +986,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [cases, parties, isBootstrapped, localFileSyncEnabled, localFileSyncSupported]);
 
   const signIn = async (email: string, password: string) => {
-    if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请切换到联网模式后登录。' };
-    if (!supabase) return { ok: false, message: '云端同步未配置。' };
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { ok: false, message: error.message };
-    return { ok: true };
+    return { ok: false, message: 'COS 模式无需登录，请在设置页填写密钥配置。' };
   };
 
   const signUp = async (email: string, password: string) => {
-    if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请切换到联网模式后注册。' };
-    if (!supabase) return { ok: false, message: '云端同步未配置。' };
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) return { ok: false, message: error.message };
-    return { ok: true };
+    return { ok: false, message: 'COS 模式无需注册账号，请直接填写 COS 配置。' };
   };
 
   const signOut = async () => {
-    if (syncMode !== 'online') return;
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    // Do not wipe local data on sign out; user can still view/edit locally.
+    // no-op in COS mode
     setSyncStatus('offline');
-    setSyncError('请先在设置页登录后再同步');
+    setSyncError('已退出联网状态。');
   };
 
   const setAppTitle = (title: string) => {
@@ -993,6 +1085,184 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     a.click();
   };
 
+  const exportSegmentedToZip = useCallback(async () => {
+    try {
+      const zip = new JSZip();
+      const casesFolder = zip.folder('cases');
+      const partiesFolder = zip.folder('parties');
+      if (!casesFolder || !partiesFolder) {
+        return { ok: false, message: '创建 ZIP 目录失败。' };
+      }
+
+      for (const item of cases) {
+        const fileName = `${encodeURIComponent(item.id)}.json`;
+        casesFolder.file(fileName, JSON.stringify(item, null, 2));
+      }
+      for (const item of parties) {
+        const fileName = `${encodeURIComponent(item.id)}.json`;
+        partiesFolder.file(fileName, JSON.stringify(item, null, 2));
+      }
+
+      zip.file('manifest.json', JSON.stringify({
+        version: 2,
+        mode: 'segmented',
+        updatedAt: nowISO(),
+        caseCount: cases.length,
+        partyCount: parties.length,
+        caseIds: cases.map((item) => item.id),
+        partyIds: parties.map((item) => item.id),
+      }, null, 2));
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `LawyerOS_Backup_${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return { ok: true, message: '已导出 ZIP 备份包。' };
+    } catch (error: any) {
+      return { ok: false, message: readableError(error, '导出 ZIP 失败。') };
+    }
+  }, [cases, parties]);
+
+  const importSegmentedFromZip = useCallback(async (file: File | null) => {
+    if (!file) return { ok: false, message: '未选择 ZIP 文件。' };
+    try {
+      const zip = await JSZip.loadAsync(file);
+      const caseRows: Case[] = [];
+      const partyRows: Party[] = [];
+      let legacyPayloadLoaded = false;
+
+      const entries = Object.values(zip.files);
+      for (const entry of entries) {
+        if (entry.dir) continue;
+        const path = entry.name.replace(/\\/g, '/');
+        const lower = path.toLowerCase();
+        if (!lower.endsWith('.json')) continue;
+        const text = await entry.async('text');
+        let parsed: any;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          continue;
+        }
+
+        if (lower.startsWith('cases/')) {
+          caseRows.push(normalizeCase(parsed));
+        } else if (lower.startsWith('parties/')) {
+          partyRows.push(parsed as Party);
+        } else if (lower === 'manifest.json') {
+          continue;
+        } else if (parsed?.mode === 'segmented-export' || parsed?.cases || Array.isArray(parsed)) {
+          let importedCases: Case[] = [];
+          let importedParties: Party[] = [];
+          if (parsed?.mode === 'segmented-export' && parsed?.data && typeof parsed.data === 'object') {
+            importedCases = Object.values(parsed.data.cases || {}).map((item: any) => normalizeCase(item));
+            importedParties = Object.values(parsed.data.parties || {}) as Party[];
+          } else {
+            importedCases = (Array.isArray(parsed) ? parsed : (parsed.cases || [])).map(normalizeCase);
+            importedParties = Array.isArray(parsed) ? [] : (parsed.parties || []);
+          }
+          if (importedCases.length || importedParties.length) {
+            caseRows.splice(0, caseRows.length, ...importedCases);
+            partyRows.splice(0, partyRows.length, ...importedParties);
+            legacyPayloadLoaded = true;
+            break;
+          }
+        }
+      }
+
+      if (!caseRows.length && !partyRows.length) {
+        return { ok: false, message: 'ZIP 中未识别到可导入数据（需要 cases/parties 或旧版单文件 JSON）。' };
+      }
+
+      createSnapshot('before-zip-import', cases, parties);
+      setCases(caseRows);
+      setParties(partyRows);
+      return {
+        ok: true,
+        message: legacyPayloadLoaded
+          ? `已从 ZIP（旧版单文件）导入：案件 ${caseRows.length}，当事人 ${partyRows.length}`
+          : `已从 ZIP 导入：案件 ${caseRows.length}，当事人 ${partyRows.length}`
+      };
+    } catch (error: any) {
+      return { ok: false, message: readableError(error, '导入 ZIP 失败。') };
+    }
+  }, [cases, createSnapshot, parties]);
+
+  const exportSegmentedToFolder = useCallback(async () => {
+    if (!('showDirectoryPicker' in window)) {
+      return { ok: false, message: '当前浏览器不支持文件夹导出，请改用单文件备份。' };
+    }
+    try {
+      const target = await pickSyncDirectory();
+      await writePayloadToTarget(target, { cases, parties });
+      return { ok: true, message: `已导出到文件夹：${getTargetName(target)}` };
+    } catch (error: any) {
+      return { ok: false, message: readableError(error, '已取消文件夹导出。') };
+    }
+  }, [cases, parties]);
+
+  const importSegmentedFromFolder = useCallback(async () => {
+    if (!('showDirectoryPicker' in window)) {
+      return { ok: false, message: '当前浏览器不支持文件夹导入，请改用单文件导入。' };
+    }
+    try {
+      const target = await pickSyncDirectory();
+      const payload = await readPayloadFromTarget(target);
+      const importedCases = (payload.cases || []).map(normalizeCase);
+      const importedParties = payload.parties || [];
+      createSnapshot('before-folder-import', cases, parties);
+      setCases(importedCases);
+      setParties(importedParties);
+      return { ok: true, message: `已从文件夹导入：${getTargetName(target)}（案件 ${importedCases.length}，当事人 ${importedParties.length}）` };
+    } catch (error: any) {
+      return { ok: false, message: readableError(error, '已取消文件夹导入。') };
+    }
+  }, [cases, createSnapshot, parties]);
+
+  const importSegmentedFromDirectoryFiles = useCallback(async (files: FileList | File[] | null) => {
+    try {
+      const list = Array.from(files || []);
+      if (!list.length) {
+        return { ok: false, message: '未读取到文件夹内容。' };
+      }
+
+      const caseRows: Case[] = [];
+      const partyRows: Party[] = [];
+
+      for (const file of list) {
+        const rel = (file as any).webkitRelativePath || file.name || '';
+        const lower = String(rel).toLowerCase();
+        if (!lower.endsWith('.json')) continue;
+        const text = await file.text();
+        let parsed: any;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          continue;
+        }
+        if (lower.includes('/cases/')) {
+          caseRows.push(normalizeCase(parsed));
+        } else if (lower.includes('/parties/')) {
+          partyRows.push(parsed as Party);
+        }
+      }
+
+      if (!caseRows.length && !partyRows.length) {
+        return { ok: false, message: '未识别到 cases/parties 分模块文件。' };
+      }
+
+      createSnapshot('before-folder-files-import', cases, parties);
+      setCases(caseRows);
+      setParties(partyRows);
+      return { ok: true, message: `已导入分模块文件夹（案件 ${caseRows.length}，当事人 ${partyRows.length}）` };
+    } catch (error: any) {
+      return { ok: false, message: readableError(error, '文件夹导入失败。') };
+    }
+  }, [cases, createSnapshot, parties]);
+
   const pullFromLocalFileSync = useCallback(async () => {
     try {
       return await pullFromBoundLocalFile();
@@ -1016,18 +1286,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteParty,
         importData,
         exportData,
+        exportSegmentedToZip,
+        importSegmentedFromZip,
+        exportSegmentedToFolder,
+        importSegmentedFromFolder,
+        importSegmentedFromDirectoryFiles,
         syncStatus,
         syncError,
         lastSyncedAt,
-        isSupabaseEnabled: isSupabaseConfigured && syncMode === 'online',
-        authLoading,
-        isAuthenticated: Boolean(authUser),
-        userEmail: authUser?.email || null,
+        isSupabaseEnabled: syncMode === 'online' && isCosConfigured,
+        authLoading: false,
+        isAuthenticated: syncMode === 'online' && isCosConfigured,
+        userEmail: syncMode === 'online' && isCosConfigured ? `${cosConfig.bucket}@${cosConfig.region}` : null,
         syncMode,
         setSyncMode,
         signIn,
         signUp,
         signOut,
+        cosConfig,
+        setCosConfig,
+        isCosConfigured,
         forceUploadToSupabaseNow,
         forceDownloadFromSupabaseNow,
         localFileSyncSupported,
