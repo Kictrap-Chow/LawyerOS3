@@ -26,15 +26,6 @@ import {
   pushSupabaseSegmented,
   readSupabaseSegmentedManifestMeta,
 } from './supabaseSegmentedSync';
-import {
-  emptyCosConfig,
-  isCosConfigReady,
-  loadCosConfig,
-  pullFromCos,
-  pushToCos,
-  saveCosConfig,
-  type CosConfig,
-} from './cosSync';
 
 interface DataContextType {
   cases: Case[];
@@ -66,9 +57,6 @@ interface DataContextType {
   signIn: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   signUp: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   signOut: () => Promise<void>;
-  cosConfig: CosConfig;
-  setCosConfig: (next: CosConfig) => void;
-  isCosConfigured: boolean;
   forceUploadToSupabaseNow: () => Promise<{ ok: boolean; message: string }>;
   forceDownloadFromSupabaseNow: () => Promise<{ ok: boolean; message: string }>;
   localFileSyncSupported: boolean;
@@ -165,7 +153,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isBootstrapped, setIsBootstrapped] = useState(false);
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [authUser, setAuthUser] = useState<User | null>(null);
-  const [cosConfig, setCosConfigState] = useState<CosConfig>(() => loadCosConfig());
   const [syncMode, setSyncModeState] = useState<'local' | 'online'>(() => {
     const saved = localStorage.getItem(APP_KEY_SYNC_MODE);
     if (saved === 'local' || saved === 'online') return saved;
@@ -175,7 +162,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [localFileSyncFileName, setLocalFileSyncFileName] = useState<string | null>(null);
   const [localFileSyncMessage, setLocalFileSyncMessage] = useState<string | null>(null);
   const [localFileSyncKind, setLocalFileSyncKind] = useState<'file' | 'directory' | null>(null);
-  const isCosConfigured = isCosConfigReady(cosConfig);
 
   const skipNextSyncRef = useRef(false);
   const skipNextLocalSyncPushRef = useRef(false);
@@ -199,13 +185,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (mode === 'local') {
       setSyncError(null);
     }
-  };
-
-  const setCosConfig = (next: CosConfig) => {
-    setCosConfigState(next);
-    saveCosConfig(next);
-    mutationDuringBootstrapRef.current = false;
-    setIsBootstrapped(false);
   };
 
   useEffect(() => {
@@ -407,24 +386,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [syncMode]);
 
-  const pullFromCosCloud = useCallback(async () => {
-    if (!isCosConfigReady(cosConfig)) {
-      throw new Error('请先在设置中完整填写 COS 配置。');
-    }
-    const payload = await pullFromCos(cosConfig);
-    return {
-      cases: payload.cases.map(normalizeCase),
-      parties: payload.parties,
-    };
-  }, [cosConfig]);
-
-  const pushToCosCloud = useCallback(async (nextCases: Case[], nextParties: Party[]) => {
-    if (!isCosConfigReady(cosConfig)) {
-      throw new Error('请先在设置中完整填写 COS 配置。');
-    }
-    await pushToCos(cosConfig, { cases: nextCases, parties: nextParties });
-  }, [cosConfig]);
-
   const pullSupabaseLegacyTables = useCallback(async (ownerId: string) => {
     if (!supabase) return { cases: [] as Case[], parties: [] as Party[] };
     let casesRes: any;
@@ -572,9 +533,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [loadFromLocal, pullSupabaseData]);
 
   useEffect(() => {
-    setAuthLoading(false);
-    setAuthUser(null);
-  }, [syncMode]);
+    if (!supabase || !isSupabaseConfigured) {
+      setAuthLoading(false);
+      setAuthUser(null);
+      return;
+    }
+    let mounted = true;
+    setAuthLoading(true);
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setAuthUser(data.session?.user ?? null);
+      setAuthLoading(false);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      setAuthUser(session?.user ?? null);
+    });
+    return () => {
+      mounted = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     if (isBootstrapped) return;
@@ -621,43 +600,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (syncMode === 'online') {
-        if (!isCosConfigReady(cosConfig)) {
+        if (!isSupabaseConfigured || !supabase) {
           loadFromLocal();
           setSyncStatus('offline');
-          setSyncError('请先在设置页填写 COS 配置后再同步。');
+          setSyncError('未配置 Supabase。请填写 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY。');
           setIsBootstrapped(true);
           return;
         }
-        try {
-          const payload = await pullFromCosCloud();
-          const remoteEmpty = payload.cases.length === 0 && payload.parties.length === 0;
-          const localCaseCount = parseLocalList<Case>(APP_KEY_CASES).length;
-          const localPartyCount = parseLocalList<Party>(APP_KEY_PARTIES).length;
-          const localHasData = localCaseCount > 0 || localPartyCount > 0;
-          if (remoteEmpty && localHasData) {
-            loadFromLocal();
-            setSyncStatus('online');
-            setSyncError('检测到 COS 云端为空，已保留本地数据。可点“立即上传”初始化云端分模块文件。');
-            setIsBootstrapped(true);
-            return;
-          }
-          if (shouldAbortBootstrapApply()) {
-            setIsBootstrapped(true);
-            return;
-          }
-          applyDataset(payload.cases, payload.parties, true);
-          setSyncStatus('online');
-          setSyncError(null);
-          setLastSyncedAt(nowISO());
-          setIsBootstrapped(true);
-          return;
-        } catch (error: any) {
+        if (!authUser?.id) {
           loadFromLocal();
-          setSyncStatus('error');
-          setSyncError(readableError(error, 'COS 拉取失败'));
+          setSyncStatus('offline');
+          setSyncError('请先登录 Supabase。');
           setIsBootstrapped(true);
           return;
         }
+        const loaded = await loadFromSupabase(authUser.id);
+        if (!loaded) loadFromLocal();
+        setIsBootstrapped(true);
+        return;
       }
 
       const serverLoaded = await loadFromServerFile();
@@ -673,7 +633,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     void bootstrap();
-  }, [cosConfig, isBootstrapped, loadFromLocal, loadFromServerFile, localFileSyncEnabled, localFileSyncSupported, pullFromBoundLocalFile, pullFromCosCloud, syncMode]);
+  }, [authUser?.id, isBootstrapped, loadFromLocal, loadFromServerFile, loadFromSupabase, localFileSyncEnabled, localFileSyncSupported, pullFromBoundLocalFile, syncMode]);
 
   const saveToServerFile = useCallback(async (nextCases: Case[], nextParties: Party[]) => {
     try {
@@ -688,21 +648,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const syncToSupabase = useCallback(async (nextCases: Case[], nextParties: Party[], ownerId: string | null) => {
-    if (syncMode === 'online') {
-      try {
-        setSyncStatus('syncing');
-        await pushToCosCloud(nextCases, nextParties);
-        setSyncStatus('online');
-        setSyncError(null);
-        setLastSyncedAt(nowISO());
-      } catch (error: any) {
-        setSyncStatus('error');
-        setSyncError(readableError(error, 'COS 同步失败'));
-      }
+    if (syncMode !== 'online') {
+      await saveToServerFile(nextCases, nextParties);
       return;
     }
     if (!supabase || !isSupabaseConfigured) {
-      await saveToServerFile(nextCases, nextParties);
+      setSyncStatus('error');
+      setSyncError('云端同步未配置。');
       return;
     }
     if (!ownerId) return;
@@ -770,42 +722,51 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSyncStatus('error');
       setSyncError(readableError(error, 'Supabase sync failed'));
     }
-  }, [getSupabaseLegacyRemoteMeta, pushSupabaseLegacyTables, pushToCosCloud, saveToServerFile, syncMode]);
+  }, [getSupabaseLegacyRemoteMeta, pushSupabaseLegacyTables, saveToServerFile, syncMode]);
 
   const forceUploadToSupabaseNow = useCallback(async () => {
     if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
+    if (!supabase || !isSupabaseConfigured) return { ok: false, message: '云端同步未配置。' };
+    if (!authUser?.id) return { ok: false, message: '请先登录 Supabase。' };
     try {
       setSyncStatus('syncing');
-      await pushToCosCloud(cases, parties);
+      try {
+        await pushSupabaseSegmented(supabase, supabaseSyncBucket, authUser.id, { cases, parties });
+      } catch (error: any) {
+        if (!isBucketNotFoundError(error)) throw error;
+        await pushSupabaseLegacyTables(cases, parties, authUser.id);
+      }
       setSyncStatus('online');
       setSyncError(null);
       setLastSyncedAt(nowISO());
-      return { ok: true, message: '已立即上传到 COS（本地覆盖云端）。' };
+      return { ok: true, message: '已立即上传：本地已强制覆盖云端。' };
     } catch (error: any) {
-      const message = readableError(error, 'COS 强制上传失败');
+      const message = readableError(error, 'Supabase 强制上传失败');
       setSyncStatus('error');
       setSyncError(message);
       return { ok: false, message };
     }
-  }, [cases, parties, pushToCosCloud, syncMode]);
+  }, [authUser?.id, cases, parties, pushSupabaseLegacyTables, syncMode]);
 
   const forceDownloadFromSupabaseNow = useCallback(async () => {
     if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
+    if (!supabase || !isSupabaseConfigured) return { ok: false, message: '云端同步未配置。' };
+    if (!authUser?.id) return { ok: false, message: '请先登录 Supabase。' };
     try {
       setSyncStatus('syncing');
-      const payload = await pullFromCosCloud();
-      applyDataset(payload.cases, payload.parties, true);
+      const { cases: remoteCases, parties: remoteParties } = await pullSupabaseData(authUser.id);
+      applyDataset(remoteCases, remoteParties, true);
       setSyncStatus('online');
       setSyncError(null);
       setLastSyncedAt(nowISO());
-      return { ok: true, message: '已立即从 COS 下载（云端覆盖本地）。' };
+      return { ok: true, message: '已立即下载：云端已强制覆盖本地。' };
     } catch (error: any) {
-      const message = readableError(error, 'COS 强制下载失败');
+      const message = readableError(error, 'Supabase 强制下载失败');
       setSyncStatus('error');
       setSyncError(message);
       return { ok: false, message };
     }
-  }, [pullFromCosCloud, syncMode]);
+  }, [authUser?.id, pullSupabaseData, syncMode]);
 
   /*
    * Legacy Supabase fallback path (kept for historical compatibility).
@@ -986,17 +947,32 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [cases, parties, isBootstrapped, localFileSyncEnabled, localFileSyncSupported]);
 
   const signIn = async (email: string, password: string) => {
-    return { ok: false, message: 'COS 模式无需登录，请在设置页填写密钥配置。' };
+    if (!supabase || !isSupabaseConfigured) return { ok: false, message: '云端同步未配置。' };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { ok: false, message: error.message };
+    setAuthUser(data.user ?? null);
+    if (data.user?.id && syncMode === 'online') {
+      await loadFromSupabase(data.user.id);
+    }
+    return { ok: true };
   };
 
   const signUp = async (email: string, password: string) => {
-    return { ok: false, message: 'COS 模式无需注册账号，请直接填写 COS 配置。' };
+    if (!supabase || !isSupabaseConfigured) return { ok: false, message: '云端同步未配置。' };
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) return { ok: false, message: error.message };
+    return { ok: true };
   };
 
   const signOut = async () => {
-    // no-op in COS mode
-    setSyncStatus('offline');
-    setSyncError('已退出联网状态。');
+    if (supabase && isSupabaseConfigured) {
+      await supabase.auth.signOut();
+    }
+    setAuthUser(null);
+    if (syncMode === 'online') {
+      setSyncStatus('offline');
+      setSyncError('已退出 Supabase 登录。');
+    }
   };
 
   const setAppTitle = (title: string) => {
@@ -1294,18 +1270,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         syncStatus,
         syncError,
         lastSyncedAt,
-        isSupabaseEnabled: syncMode === 'online' && isCosConfigured,
-        authLoading: false,
-        isAuthenticated: syncMode === 'online' && isCosConfigured,
-        userEmail: syncMode === 'online' && isCosConfigured ? `${cosConfig.bucket}@${cosConfig.region}` : null,
+        isSupabaseEnabled: syncMode === 'online' && isSupabaseConfigured,
+        authLoading,
+        isAuthenticated: syncMode === 'online' && Boolean(authUser),
+        userEmail: syncMode === 'online' ? (authUser?.email || null) : null,
         syncMode,
         setSyncMode,
         signIn,
         signUp,
         signOut,
-        cosConfig,
-        setCosConfig,
-        isCosConfigured,
         forceUploadToSupabaseNow,
         forceDownloadFromSupabaseNow,
         localFileSyncSupported,

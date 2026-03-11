@@ -10,7 +10,6 @@ export const Settings: React.FC = () => {
   const { preset, setPreset, accent, setAccent, textColor, setTextColor, font, setFont } = useTheme();
   const {
     isSupabaseEnabled, authLoading, isAuthenticated, userEmail, syncMode, setSyncMode, signIn, signUp, signOut,
-    cosConfig, setCosConfig, isCosConfigured,
     forceUploadToSupabaseNow, forceDownloadFromSupabaseNow,
     exportData, importData, exportSegmentedToZip, importSegmentedFromZip, exportSegmentedToFolder, importSegmentedFromFolder, importSegmentedFromDirectoryFiles,
     localFileSyncSupported, localFileSyncEnabled, localFileSyncKind, localFileSyncFileName, localFileSyncMessage,
@@ -30,7 +29,6 @@ export const Settings: React.FC = () => {
   const folderInputRef = useRef<HTMLInputElement>(null);
   const zipInputRef = useRef<HTMLInputElement>(null);
   const [calendarToken, setCalendarToken] = useState(() => localStorage.getItem('calendarFeedToken') || '');
-  const [cosDraft, setCosDraft] = useState(cosConfig);
 
   const calendarFeedUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -67,18 +65,6 @@ export const Settings: React.FC = () => {
     await signOut();
     setAuthBusy(false);
     setAuthMessage('已退出登录。');
-  };
-
-  useEffect(() => {
-    setCosDraft(cosConfig);
-  }, [cosConfig]);
-
-  const handleSaveCosConfig = () => {
-    setCosConfig({
-      ...cosDraft,
-      prefix: (cosDraft.prefix || 'LawyerOS3').trim(),
-    });
-    setOnlineSyncActionMessage('COS 配置已保存。');
   };
 
   const handleForceUploadNow = async () => {
@@ -288,7 +274,7 @@ export const Settings: React.FC = () => {
             )}
             onClick={() => setSyncMode('online')}
           >
-            联网（COS）
+            联网（Supabase）
           </button>
         </div>
         {syncMode === 'local' && (
@@ -361,57 +347,59 @@ export const Settings: React.FC = () => {
         {syncMode === 'online' && (
           <div className="space-y-2">
             <div className="text-xs text-[#6a7d93]">
-              联网模式使用腾讯云 COS 分模块同步：`manifest + cases + parties`。
+              联网模式使用 Supabase 云端同步。
             </div>
+            {!isSupabaseEnabled && (
+              <div className="text-xs text-[#8b6b4e]">
+                未检测到 Supabase 配置。请在部署环境中设置 `VITE_SUPABASE_URL` 与 `VITE_SUPABASE_ANON_KEY`。
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <input
-                value={cosDraft.secretId}
-                onChange={(e) => setCosDraft((prev) => ({ ...prev, secretId: e.target.value }))}
-                placeholder="SecretId"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="邮箱"
                 className="w-full text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
               />
               <input
-                value={cosDraft.secretKey}
-                onChange={(e) => setCosDraft((prev) => ({ ...prev, secretKey: e.target.value }))}
-                placeholder="SecretKey"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="密码"
                 className="w-full text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
-              />
-              <input
-                value={cosDraft.region}
-                onChange={(e) => setCosDraft((prev) => ({ ...prev, region: e.target.value }))}
-                placeholder="Region（例如 ap-guangzhou）"
-                className="w-full text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
-              />
-              <input
-                value={cosDraft.bucket}
-                onChange={(e) => setCosDraft((prev) => ({ ...prev, bucket: e.target.value }))}
-                placeholder="Bucket（例如 mybucket-1250000000）"
-                className="w-full text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
-              />
-              <input
-                value={cosDraft.prefix}
-                onChange={(e) => setCosDraft((prev) => ({ ...prev, prefix: e.target.value }))}
-                placeholder="Prefix（默认 LawyerOS3）"
-                className="w-full md:col-span-2 text-sm bg-white border tint-border rounded px-3 py-2 outline-none"
               />
             </div>
             <div className="flex flex-wrap gap-2">
               <button
-                disabled={authBusy}
-                onClick={handleSaveCosConfig}
+                disabled={authBusy || authLoading || !isSupabaseEnabled}
+                onClick={handleSignIn}
                 className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60"
               >
-                保存 COS 配置
+                登录
               </button>
               <button
-                disabled={authBusy || !isCosConfigured}
+                disabled={authBusy || authLoading || !isSupabaseEnabled}
+                onClick={handleSignUp}
+                className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60"
+              >
+                注册
+              </button>
+              <button
+                disabled={authBusy || authLoading || !isAuthenticated}
+                onClick={handleSignOut}
+                className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60"
+              >
+                退出
+              </button>
+              <button
+                disabled={authBusy || !isAuthenticated}
                 onClick={handleForceUploadNow}
                 className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60"
               >
                 立即上传（覆盖云端）
               </button>
               <button
-                disabled={authBusy || !isCosConfigured}
+                disabled={authBusy || !isAuthenticated}
                 onClick={handleForceDownloadNow}
                 className="px-3 py-1.5 rounded text-sm border tint-border hover:bg-white disabled:opacity-60"
               >
@@ -419,9 +407,11 @@ export const Settings: React.FC = () => {
               </button>
             </div>
             <div className="text-xs text-[#6a7d93]">
-              状态：{isCosConfigured ? `已配置（${cosConfig.bucket}@${cosConfig.region}）` : '未配置'}
+              状态：{isAuthenticated ? `已登录（${userEmail || 'Supabase 用户'}）` : '未登录'}
             </div>
-            {onlineSyncActionMessage && <div className="text-xs text-[#6a7d93]">{onlineSyncActionMessage}</div>}
+            {(onlineSyncActionMessage || authMessage) && (
+              <div className="text-xs text-[#6a7d93]">{onlineSyncActionMessage || authMessage}</div>
+            )}
           </div>
         )}
       </div>
