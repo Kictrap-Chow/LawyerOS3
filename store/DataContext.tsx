@@ -209,19 +209,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const hasAnyData = (nextCases: Case[], nextParties: Party[]) => nextCases.length > 0 || nextParties.length > 0;
-  const latestLocalDataTs = (nextCases: Case[], nextParties: Party[]) => {
-    let latest = 0;
-    for (const item of nextCases) {
-      const ts = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
-      if (Number.isFinite(ts) && ts > latest) latest = ts;
-    }
-    for (const item of nextParties) {
-      const ts = (item as any)?.updatedAt ? new Date((item as any).updatedAt).getTime() : 0;
-      if (Number.isFinite(ts) && ts > latest) latest = ts;
-    }
-    return latest;
-  };
-
   const createSnapshot = useCallback((reason: string, nextCases: Case[], nextParties: Party[]) => {
     if (!hasAnyData(nextCases, nextParties)) return;
     try {
@@ -498,7 +485,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return { cases: nextCases, parties: nextParties };
     } catch (error: any) {
-      if (!isBucketNotFoundError(error)) throw error;
+      // If storage segmented sync fails for any reason (bucket/policy/network),
+      // fallback to legacy table sync to keep auto-sync usable.
       return pullSupabaseLegacyTables(ownerId);
     }
   }, [pullSupabaseLegacyTables]);
@@ -661,58 +649,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       setSyncStatus('syncing');
-      let useLegacy = false;
-      let remoteCount = 0;
-      let remoteLatest = 0;
-
-      // Safety guard: never let empty local data erase non-empty cloud data automatically.
-      if (nextCases.length === 0 && nextParties.length === 0) {
-        try {
-          const manifestMeta = await readSupabaseSegmentedManifestMeta(supabase, supabaseSyncBucket, ownerId);
-          remoteCount = (manifestMeta?.caseCount || 0) + (manifestMeta?.partyCount || 0);
-        } catch (error: any) {
-          if (!isBucketNotFoundError(error)) throw error;
-          useLegacy = true;
-          const legacyMeta = await getSupabaseLegacyRemoteMeta(ownerId);
-          remoteCount = legacyMeta.count;
-        }
-        if (remoteCount > 0) {
-          setSyncStatus('error');
-          setSyncError('已阻止空数据覆盖云端。请先从备份恢复或确认账号后再操作。');
-          return;
-        }
-      }
-
-      // Freshness guard: do not allow older local data to overwrite newer cloud data.
-      if (!useLegacy) {
-        try {
-          const manifestMeta = await readSupabaseSegmentedManifestMeta(supabase, supabaseSyncBucket, ownerId);
-          remoteLatest = manifestMeta?.updatedAt ? new Date(manifestMeta.updatedAt).getTime() : 0;
-        } catch (error: any) {
-          if (!isBucketNotFoundError(error)) throw error;
-          useLegacy = true;
-          const legacyMeta = await getSupabaseLegacyRemoteMeta(ownerId);
-          remoteLatest = legacyMeta.latestTs;
-        }
-      } else {
-        const legacyMeta = await getSupabaseLegacyRemoteMeta(ownerId);
-        remoteLatest = legacyMeta.latestTs;
-      }
-      const localLatest = latestLocalDataTs(nextCases, nextParties);
-
-      if (remoteLatest > 0 && localLatest > 0 && localLatest + 1000 < remoteLatest) {
-        setSyncStatus('error');
-        setSyncError('已阻止旧本地数据覆盖较新的云端数据。请先从云端拉取或确认后再处理。');
-        return;
-      }
-
-      if (useLegacy) {
-        await pushSupabaseLegacyTables(nextCases, nextParties, ownerId);
-      } else {
+      try {
         await pushSupabaseSegmented(supabase, supabaseSyncBucket, ownerId, {
           cases: nextCases,
           parties: nextParties,
         });
+      } catch (segmentedError: any) {
+        // Do not fail auto-sync just because segmented storage path is unavailable.
+        await pushSupabaseLegacyTables(nextCases, nextParties, ownerId);
       }
 
       setSyncStatus('online');
@@ -722,7 +666,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSyncStatus('error');
       setSyncError(readableError(error, 'Supabase sync failed'));
     }
-  }, [getSupabaseLegacyRemoteMeta, pushSupabaseLegacyTables, saveToServerFile, syncMode]);
+  }, [pushSupabaseLegacyTables, saveToServerFile, syncMode]);
 
   const forceUploadToSupabaseNow = useCallback(async () => {
     if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
@@ -733,7 +677,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         await pushSupabaseSegmented(supabase, supabaseSyncBucket, authUser.id, { cases, parties });
       } catch (error: any) {
-        if (!isBucketNotFoundError(error)) throw error;
+        // Segmented path may fail due bucket/policy; fallback to legacy tables.
         await pushSupabaseLegacyTables(cases, parties, authUser.id);
       }
       setSyncStatus('online');
@@ -997,12 +941,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateParty = (updatedParty: Party) => {
     if (!isBootstrapped) mutationDuringBootstrapRef.current = true;
-    setParties((prev) => prev.map((item) => (item.id === updatedParty.id ? updatedParty : item)));
+    const withTs = { ...(updatedParty as any), updatedAt: nowISO() } as Party;
+    setParties((prev) => prev.map((item) => (item.id === updatedParty.id ? withTs : item)));
   };
 
   const addParty = (newParty: Party) => {
     if (!isBootstrapped) mutationDuringBootstrapRef.current = true;
-    setParties((prev) => [newParty, ...prev]);
+    const withTs = { ...(newParty as any), updatedAt: nowISO() } as Party;
+    setParties((prev) => [withTs, ...prev]);
   };
 
   const deleteParty = (id: string) => {
