@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { Case, Party } from '../types';
 import { nowISO } from '../utils';
 import JSZip from 'jszip';
-import { isSupabaseConfigured, supabase, supabaseSyncBucket } from './supabase';
+import { isSupabaseConfigured, supabase } from './supabase';
 import { User } from '@supabase/supabase-js';
 import {
   canReadWriteTarget,
@@ -21,11 +21,6 @@ import {
   writePayloadToTarget,
   type LocalSyncTarget,
 } from './localFileSync';
-import {
-  pullSupabaseSegmented,
-  pushSupabaseSegmented,
-  readSupabaseSegmentedManifestMeta,
-} from './supabaseSegmentedSync';
 
 interface DataContextType {
   cases: Case[];
@@ -113,11 +108,6 @@ const normalizeCase = (item: any): Case => ({
   clients: Array.isArray(item?.clients) ? item.clients : [],
   opponents: Array.isArray(item?.opponents) ? item.opponents : [],
 });
-
-const isBucketNotFoundError = (error: any) => {
-  const msg = String(error?.message || '').toLowerCase();
-  return msg.includes('bucket not found') || msg.includes('not found');
-};
 
 const readableError = (error: any, fallback: string) => {
   const direct = typeof error === 'string' ? error : typeof error?.message === 'string' ? error.message : '';
@@ -465,30 +455,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const pullSupabaseData = useCallback(async (ownerId: string) => {
     if (!supabase || !ownerId) return { cases: [] as Case[], parties: [] as Party[] };
-    try {
-      let nextCases: Case[] = [];
-      let nextParties: Party[] = [];
-      const segmented = await pullSupabaseSegmented(supabase, supabaseSyncBucket, ownerId);
-      nextCases = segmented.cases.map(normalizeCase);
-      nextParties = segmented.parties as Party[];
-
-      if (nextCases.length === 0 && nextParties.length === 0 && !segmented.hasRemoteData) {
-        const legacy = await pullSupabaseLegacyTables(ownerId);
-        nextCases = legacy.cases;
-        nextParties = legacy.parties;
-        if (nextCases.length > 0 || nextParties.length > 0) {
-          await pushSupabaseSegmented(supabase, supabaseSyncBucket, ownerId, {
-            cases: nextCases,
-            parties: nextParties,
-          });
-        }
-      }
-      return { cases: nextCases, parties: nextParties };
-    } catch (error: any) {
-      // If storage segmented sync fails for any reason (bucket/policy/network),
-      // fallback to legacy table sync to keep auto-sync usable.
-      return pullSupabaseLegacyTables(ownerId);
-    }
+    return pullSupabaseLegacyTables(ownerId);
   }, [pullSupabaseLegacyTables]);
 
   const loadFromSupabase = useCallback(async (ownerId: string) => {
@@ -649,15 +616,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       setSyncStatus('syncing');
-      try {
-        await pushSupabaseSegmented(supabase, supabaseSyncBucket, ownerId, {
-          cases: nextCases,
-          parties: nextParties,
-        });
-      } catch (segmentedError: any) {
-        // Do not fail auto-sync just because segmented storage path is unavailable.
-        await pushSupabaseLegacyTables(nextCases, nextParties, ownerId);
-      }
+      await pushSupabaseLegacyTables(nextCases, nextParties, ownerId);
 
       setSyncStatus('online');
       setSyncError(null);
@@ -674,12 +633,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!authUser?.id) return { ok: false, message: '请先登录 Supabase。' };
     try {
       setSyncStatus('syncing');
-      try {
-        await pushSupabaseSegmented(supabase, supabaseSyncBucket, authUser.id, { cases, parties });
-      } catch (error: any) {
-        // Segmented path may fail due bucket/policy; fallback to legacy tables.
-        await pushSupabaseLegacyTables(cases, parties, authUser.id);
-      }
+      await pushSupabaseLegacyTables(cases, parties, authUser.id);
       setSyncStatus('online');
       setSyncError(null);
       setLastSyncedAt(nowISO());
@@ -707,54 +661,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       const message = readableError(error, 'Supabase 强制下载失败');
       setSyncStatus('error');
-      setSyncError(message);
-      return { ok: false, message };
-    }
-  }, [authUser?.id, pullSupabaseData, syncMode]);
-
-  /*
-   * Legacy Supabase fallback path (kept for historical compatibility).
-   * Current online mode now prefers COS and returns above.
-   */
-  const legacyForceUploadToSupabaseNow = useCallback(async () => {
-    if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
-    if (!supabase || !isSupabaseConfigured) return { ok: false, message: '云端同步未配置。' };
-    if (!authUser?.id) return { ok: false, message: '请先登录 Supabase。' };
-    try {
-      setSyncStatus('syncing');
-      try {
-        await pushSupabaseSegmented(supabase, supabaseSyncBucket, authUser.id, { cases, parties });
-      } catch (error: any) {
-        if (!isBucketNotFoundError(error)) throw error;
-        await pushSupabaseLegacyTables(cases, parties, authUser.id);
-      }
-      setSyncStatus('online');
-      setSyncError(null);
-      setLastSyncedAt(nowISO());
-      return { ok: true, message: '已立即上传：本地已强制覆盖云端。' };
-    } catch (error: any) {
-      setSyncStatus('error');
-      const message = readableError(error, 'Supabase 强制上传失败');
-      setSyncError(message);
-      return { ok: false, message };
-    }
-  }, [authUser?.id, cases, parties, pushSupabaseLegacyTables, syncMode]);
-
-  const legacyForceDownloadFromSupabaseNow = useCallback(async () => {
-    if (syncMode !== 'online') return { ok: false, message: '当前为本地模式，请先切换到联网模式。' };
-    if (!supabase || !isSupabaseConfigured) return { ok: false, message: '云端同步未配置。' };
-    if (!authUser?.id) return { ok: false, message: '请先登录 Supabase。' };
-    try {
-      setSyncStatus('syncing');
-      const { cases: remoteCases, parties: remoteParties } = await pullSupabaseData(authUser.id);
-      applyDataset(remoteCases, remoteParties, true);
-      setSyncStatus('online');
-      setSyncError(null);
-      setLastSyncedAt(nowISO());
-      return { ok: true, message: '已立即下载：云端已强制覆盖本地。' };
-    } catch (error: any) {
-      setSyncStatus('error');
-      const message = readableError(error, 'Supabase 强制下载失败');
       setSyncError(message);
       return { ok: false, message };
     }
@@ -822,15 +728,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!authUser?.id) return;
 
     const refreshFromRemote = async () => {
-      let remoteTs = 0;
-      try {
-        const meta = await readSupabaseSegmentedManifestMeta(supabase, supabaseSyncBucket, authUser.id);
-        remoteTs = meta?.updatedAt ? new Date(meta.updatedAt).getTime() : 0;
-      } catch (error: any) {
-        if (!isBucketNotFoundError(error)) return;
-        const legacyMeta = await getSupabaseLegacyRemoteMeta(authUser.id);
-        remoteTs = legacyMeta.latestTs;
-      }
+      const legacyMeta = await getSupabaseLegacyRemoteMeta(authUser.id);
+      const remoteTs = legacyMeta.latestTs;
       if (!remoteTs) return;
       const localTs = lastSyncedAt ? new Date(lastSyncedAt).getTime() : 0;
       if (remoteTs > localTs + 500) {
